@@ -1,0 +1,52 @@
+# MCP Gateway Policy Configuration
+#
+# This file controls which servers/tools are allowed and sets limits
+# on output sizes and secret redaction.
+
+servers:
+  # Allowlist: If specified, ONLY these servers are allowed
+  # (empty list = allow all servers)
+  allowlist: []
+
+  # Denylist: These servers are always blocked
+  # Supports glob patterns: * matches any characters
+  denylist:
+    - "dangerous-*"
+    - "test-*"
+
+tools:
+  # Allowlist: If specified, ONLY matching tools are allowed
+  # (empty list = allow all tools)
+  # Format: "server::tool" or glob patterns
+  allowlist: []
+
+  # Denylist: These tool patterns are always blocked
+  denylist:
+    - "*::delete_*"       # Block all delete operations
+    - "*::drop_*"         # Block all drop operations
+    - "*::execute_raw_*"  # Block raw execution
+
+limits:
+  # Maximum tools to index per server (prevents huge catalogs)
+  max_tools_per_server: 100
+
+  # Maximum output size in bytes (truncated if exceeded)
+  max_output_bytes: 50000
+
+  # Rough token limit for outputs
+  max_output_tokens: 4000
+
+redaction:
+  # Regex patterns for secret detection and redaction
+  # Matched groups are replaced with [REDACTED]
+  patterns:
+    # API keys
+    - '(?i)(api[_-]?key|apikey)[\s]*[:=][\s]*["\']?([^\s"\']+)'
+    # Passwords and secrets
+    - '(?i)(secret|password|passwd|pwd)[\s]*[:=][\s]*["\']?([^\s"\']+)'
+    # Bearer tokens
+    - '(?i)(bearer|token)[\s]+[a-zA-Z0-9._-]+'
+    # AWS credentials
+    - '(?i)(aws_secret|aws_access)[\s]*[:=][\s]*["\']?([^\s"\']+)'
+    # Private keys
+    - '-----BEGIN [A-Z]+ PRIVATE KEY-----'

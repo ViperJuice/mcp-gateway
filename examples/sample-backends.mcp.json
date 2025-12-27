@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "github": {
+      "command": "mcp-server-github",
+      "args": [],
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+      }
+    },
+    "filesystem": {
+      "command": "mcp-server-filesystem",
+      "args": ["/home/user/projects"]
+    },
+    "sqlite": {
+      "command": "mcp-server-sqlite",
+      "args": ["--db", "./data/app.db"]
+    }
+  }
+}

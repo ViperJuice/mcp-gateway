@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "gateway": {
+      "command": "python3",
+      "args": ["-m", "mcp_gateway"],
+      "env": {
+        "MCP_GATEWAY_LOG_LEVEL": "info"
+      }
+    }
+  }
+}
