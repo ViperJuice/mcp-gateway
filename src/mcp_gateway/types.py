@@ -33,7 +33,7 @@ class ResolvedServerConfig(BaseModel):
     """A server config resolved from a config file."""
 
     name: str
-    source: Literal["project", "user", "custom"]
+    source: Literal["project", "user", "custom", "manifest"]
     config: McpServerConfig
 
 
@@ -258,3 +258,173 @@ class GatewayPolicy(BaseModel):
     tools: ToolPolicy = Field(default_factory=ToolPolicy)
     limits: LimitsPolicy = Field(default_factory=LimitsPolicy)
     redaction: RedactionPolicy = Field(default_factory=RedactionPolicy)
+
+
+# === Capability Request Types ===
+
+
+class CapabilityRequestInput(BaseModel):
+    """Input for gateway.request_capability."""
+
+    query: str = Field(min_length=1, description="Natural language capability request")
+    available_clis: list[str] | None = Field(
+        default=None,
+        description="Optional: CLIs known to be available in the environment",
+    )
+
+
+class CLIResolution(BaseModel):
+    """CLI alternative resolution details."""
+
+    name: str
+    path: str | None = None
+    help_output: str | None = None
+    examples: list[str] | None = None
+
+
+class CapabilityCandidate(BaseModel):
+    """A single capability candidate from BAML matching."""
+
+    name: str
+    candidate_type: Literal["cli", "server"]
+    relevance_score: float = Field(ge=0.0, le=1.0)
+    reasoning: str
+    requires_api_key: bool = False
+    api_key_available: bool = False  # True if key found in .env
+    env_var: str | None = None
+    env_instructions: str | None = None
+    # Status hints
+    is_installed: bool = False  # True if CLI is installed or server is running
+    is_running: bool = False  # True if server is already connected
+
+
+class CapabilityMatchResponse(BaseModel):
+    """Response from gateway.request_capability with ranked candidates."""
+
+    candidates: list[CapabilityCandidate]
+    recommendation: str
+    # Convenience: top candidate details
+    top_candidate: CapabilityCandidate | None = None
+
+
+class CapabilityResolution(BaseModel):
+    """Result of capability resolution (legacy single-result mode)."""
+
+    status: Literal[
+        "use_cli",  # CLI available - use via Bash
+        "available",  # MCP server already running with matching tools
+        "provisioned",  # MCP server was installed and started
+        "needs_api_key",  # MCP server exists but needs API key
+        "not_available",  # No matching capability found
+        "candidates",  # New: returning candidates for Claude to choose
+    ]
+    message: str
+
+    # For candidates status (new two-phase flow)
+    candidates: list[CapabilityCandidate] | None = None
+    recommendation: str | None = None
+
+    # For use_cli status
+    cli: CLIResolution | None = None
+
+    # For available/provisioned status
+    server: str | None = None
+    new_tools: list[CapabilityCard] | None = None
+
+    # For needs_api_key status
+    env_var: str | None = None
+    env_path: str | None = None
+    env_instructions: str | None = None
+
+    # For not_available status
+    logged_for_discovery: bool = False
+
+
+class ProvisionInput(BaseModel):
+    """Input for gateway.provision - install and start a specific server."""
+
+    server_name: str = Field(min_length=1, description="Name of the server to provision from manifest")
+
+
+class ProvisionOutput(BaseModel):
+    """Output from gateway.provision."""
+
+    ok: bool
+    server: str
+    message: str
+    # Job tracking for async installs
+    job_id: str | None = None
+    status: Literal["already_running", "started", "complete", "failed"] = "complete"
+    # Tools (only populated when status is already_running or complete)
+    new_tools: list[CapabilityCard] | None = None
+    # If provisioning failed due to API key requirement
+    needs_api_key: bool = False
+    env_var: str | None = None
+    env_instructions: str | None = None
+
+
+class ProvisionStatusInput(BaseModel):
+    """Input for gateway.provision_status - check job progress."""
+
+    job_id: str = Field(min_length=1, description="Job ID from provision response")
+
+
+class ProvisionJobStatus(BaseModel):
+    """Output from gateway.provision_status."""
+
+    job_id: str
+    server: str
+    status: Literal["pending", "installing", "server_ready", "complete", "failed", "timeout", "not_found"]
+    progress: int = Field(ge=0, le=100, description="Progress percentage 0-100")
+    message: str
+    output_tail: list[str] = Field(default_factory=list, description="Last 5 lines of output")
+    elapsed_seconds: float = 0.0
+    # Only populated when status is complete
+    new_tools: list[CapabilityCard] | None = None
+    error: str | None = None
+
+
+class SyncEnvironmentInput(BaseModel):
+    """Input for gateway.sync_environment."""
+
+    platform: Literal["mac", "wsl", "linux", "windows"] | None = None
+    detected_clis: list[str] | None = None
+
+
+class SyncEnvironmentOutput(BaseModel):
+    """Output for gateway.sync_environment."""
+
+    platform: str
+    detected_clis: list[str]
+    message: str
+
+
+# === Pre-built Descriptions Types ===
+
+
+class PrebuiltToolInfo(BaseModel):
+    """Serializable tool info for description cache."""
+
+    name: str
+    description: str
+    short_description: str
+    tags: list[str]
+    risk_hint: str  # "low", "medium", "high"
+
+
+class GeneratedServerDescriptions(BaseModel):
+    """Pre-generated descriptions for a single server."""
+
+    package: str  # e.g., "@playwright/mcp"
+    version: str  # Package version when generated
+    generated_at: str  # ISO timestamp
+    capability_summary: str  # L1: For MCP instructions
+    tools: list[PrebuiltToolInfo]  # L2: Tool cards
+
+
+class DescriptionsCache(BaseModel):
+    """Structure of .mcp-gateway/descriptions.yaml cache file."""
+
+    generated_at: str  # ISO timestamp
+    gateway_version: str
+    servers: dict[str, GeneratedServerDescriptions]

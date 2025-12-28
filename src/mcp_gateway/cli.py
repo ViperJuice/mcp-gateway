@@ -11,7 +11,7 @@ import signal
 import sys
 from pathlib import Path
 
-from mcp_gateway.server import GatewayServer
+from dotenv import load_dotenv
 
 
 def setup_logging(level: str) -> None:
@@ -32,33 +32,12 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="MCP Gateway - A meta-server for minimal Claude Code tool bloat",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-ENVIRONMENT VARIABLES:
-  MCP_GATEWAY_CONFIG      Custom config file path
-  MCP_GATEWAY_POLICY      Policy file path
-  MCP_GATEWAY_LOG_LEVEL   Log level
-
-CONFIG DISCOVERY:
-  The gateway looks for MCP server configs in this order:
-  1. .mcp.json in project root (or --project path)
-  2. ~/.mcp.json
-  3. ~/.claude/.mcp.json
-  4. Custom config (via --config or MCP_GATEWAY_CONFIG)
-
-  Project configs take precedence over user configs on name collision.
-
-EXAMPLES:
-  # Start with default config discovery
-  mcp-gateway
-
-  # Start with custom config
-  mcp-gateway --config /path/to/mcp-config.json
-
-  # Start with debug logging
-  mcp-gateway --debug
-""",
     )
 
+    # Create subparsers for commands
+    subparsers = parser.add_subparsers(dest="command", help="Commands")
+
+    # Default: run server (no subcommand needed)
     parser.add_argument(
         "-p",
         "--project",
@@ -95,11 +74,107 @@ EXAMPLES:
         help="Only show errors",
     )
 
+    # Refresh command
+    refresh_parser = subparsers.add_parser(
+        "refresh",
+        help="Refresh capability descriptions for MCP servers",
+        description="Pre-generate L1/L2 descriptions for MCP servers. "
+                    "This avoids LLM calls on every startup.",
+    )
+    refresh_parser.add_argument(
+        "--server",
+        "-s",
+        type=str,
+        help="Refresh only this server (default: all)",
+    )
+    refresh_parser.add_argument(
+        "--force",
+        "-f",
+        action="store_true",
+        help="Force refresh even if not stale",
+    )
+    refresh_parser.add_argument(
+        "--check-versions",
+        action="store_true",
+        help="Check for package version updates",
+    )
+    refresh_parser.add_argument(
+        "--cache-dir",
+        type=Path,
+        default=Path(".mcp-gateway"),
+        help="Cache directory (default: .mcp-gateway)",
+    )
+    refresh_parser.add_argument(
+        "-l",
+        "--log-level",
+        choices=["debug", "info", "warn", "error"],
+        default="info",
+        help="Log level (default: info)",
+    )
+
     return parser.parse_args()
 
 
-async def async_main(args: argparse.Namespace) -> None:
-    """Async main entry point."""
+async def run_refresh(args: argparse.Namespace) -> None:
+    """Run the refresh command."""
+    from mcp_gateway.manifest.refresher import (
+        check_staleness,
+        get_cache_path,
+        load_descriptions_cache,
+        refresh_all,
+    )
+
+    setup_logging(args.log_level)
+    logger = logging.getLogger(__name__)
+
+    cache_path = get_cache_path(args.cache_dir)
+
+    if args.check_versions:
+        # Just check for updates
+        logger.info("Checking for package version updates...")
+        stale = await check_staleness()
+
+        if not stale:
+            print("All cached descriptions are up to date.")
+        else:
+            print(f"Found {len(stale)} servers with newer versions:")
+            for name, (old, new) in stale.items():
+                print(f"  {name}: {old} -> {new}")
+            print("\nRun 'mcp-gateway refresh --force' to update.")
+        return
+
+    # Refresh descriptions
+    servers = [args.server] if args.server else None
+
+    logger.info("Refreshing capability descriptions...")
+    if servers:
+        print(f"Refreshing server: {servers[0]}")
+    else:
+        print("Refreshing all servers in manifest...")
+
+    try:
+        cache = await refresh_all(
+            cache_path=cache_path,
+            force=args.force,
+            servers=servers,
+        )
+
+        print(f"\nRefreshed {len(cache.servers)} servers:")
+        for name, desc in cache.servers.items():
+            print(f"  {name}: {len(desc.tools)} tools (v{desc.version})")
+
+        print(f"\nCache saved to: {cache_path}")
+
+    except Exception as e:
+        logger.error(f"Refresh failed: {e}")
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+async def run_server(args: argparse.Namespace) -> None:
+    """Run the MCP gateway server."""
+    from mcp_gateway.server import GatewayServer
+
     # Check environment variables
     if not args.config and os.environ.get("MCP_GATEWAY_CONFIG"):
         args.config = Path(os.environ["MCP_GATEWAY_CONFIG"])
@@ -159,8 +234,20 @@ async def async_main(args: argparse.Namespace) -> None:
         raise
 
 
+async def async_main(args: argparse.Namespace) -> None:
+    """Async main entry point - dispatch to appropriate command."""
+    if args.command == "refresh":
+        await run_refresh(args)
+    else:
+        # Default: run server
+        await run_server(args)
+
+
 def main() -> None:
     """Main entry point."""
+    # Load .env file from current directory or project root
+    load_dotenv()
+
     args = parse_args()
 
     try:

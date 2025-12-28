@@ -1,0 +1,452 @@
+version: "1.0"
+
+# CLI alternatives - prefer these over MCP servers when available
+cli_alternatives:
+  git:
+    keywords: [git, version control, commits, branches, repository, clone, push, pull]
+    check_command: ["git", "--version"]
+    help_command: ["git", "--help"]
+    description: "Git version control CLI"
+    prefer_mcp_for: [github issues, pull requests, github actions, github api]
+
+  docker:
+    keywords: [docker, container, image, dockerfile, compose]
+    check_command: ["docker", "--version"]
+    help_command: ["docker", "--help"]
+    description: "Docker container CLI"
+
+  kubectl:
+    keywords: [kubernetes, k8s, pods, deployments, services, helm]
+    check_command: ["kubectl", "version", "--client"]
+    help_command: ["kubectl", "--help"]
+    description: "Kubernetes CLI"
+
+  node:
+    keywords: [node, nodejs, npm, javascript, js, npx]
+    check_command: ["node", "--version"]
+    help_command: ["node", "--help"]
+    description: "Node.js runtime"
+
+  python:
+    keywords: [python, pip, python3, py]
+    check_command: ["python3", "--version"]
+    help_command: ["python3", "--help"]
+    description: "Python interpreter"
+
+  aws:
+    keywords: [aws, amazon, s3, ec2, lambda, cloudformation, iam]
+    check_command: ["aws", "--version"]
+    help_command: ["aws", "help"]
+    description: "AWS CLI"
+
+  gcloud:
+    keywords: [gcp, google cloud, gcloud, bigquery, gcs]
+    check_command: ["gcloud", "--version"]
+    help_command: ["gcloud", "--help"]
+    description: "Google Cloud CLI"
+
+  az:
+    keywords: [azure, az, microsoft cloud]
+    check_command: ["az", "--version"]
+    help_command: ["az", "--help"]
+    description: "Azure CLI"
+
+  terraform:
+    keywords: [terraform, infrastructure, iac, tf]
+    check_command: ["terraform", "--version"]
+    help_command: ["terraform", "--help"]
+    description: "Terraform infrastructure as code"
+
+  curl:
+    keywords: [curl, http, request, api, download]
+    check_command: ["curl", "--version"]
+    help_command: ["curl", "--help"]
+    description: "HTTP request CLI"
+
+  jq:
+    keywords: [jq, json, parse, query]
+    check_command: ["jq", "--version"]
+    help_command: ["jq", "--help"]
+    description: "JSON processor CLI"
+
+# MCP Servers - verified against official documentation
+servers:
+  # === Default Auto-Start (no API key required) ===
+
+  playwright:
+    description: "Browser automation - navigation, clicks, screenshots, DOM inspection"
+    keywords: [browser, web, automation, playwright, screenshot, click, navigate, scrape, dom]
+    install:
+      mac: ["npx", "-y", "@playwright/mcp@latest"]
+      linux: ["npx", "-y", "@playwright/mcp@latest"]
+      wsl: ["npx", "-y", "@playwright/mcp@latest"]
+      windows: ["npx", "-y", "@playwright/mcp@latest"]
+    command: "npx"
+    args: ["-y", "@playwright/mcp@latest"]
+    requires_api_key: false
+    auto_start: true
+
+  context7:
+    description: "Library documentation lookup - up-to-date docs for any package"
+    keywords: [documentation, docs, library, package, api reference, context7, readme]
+    install:
+      mac: ["npx", "-y", "@upstash/context7-mcp"]
+      linux: ["npx", "-y", "@upstash/context7-mcp"]
+      wsl: ["npx", "-y", "@upstash/context7-mcp"]
+      windows: ["cmd", "/c", "npx", "-y", "@upstash/context7-mcp"]
+    command: "npx"
+    args: ["-y", "@upstash/context7-mcp"]
+    command_windows: "cmd"
+    args_windows: ["/c", "npx", "-y", "@upstash/context7-mcp"]
+    requires_api_key: false
+    auto_start: true
+    # Optional: CONTEXT7_API_KEY for higher rate limits (60 req/hr without)
+
+  # === Reference Servers (from modelcontextprotocol/servers) ===
+
+  filesystem:
+    description: "File system operations - read, write, search, list files"
+    keywords: [file, filesystem, read, write, directory, folder, fs, path]
+    install:
+      mac: ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/"]
+      linux: ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/"]
+      wsl: ["npx", "-y", "@modelcontextprotocol/server-filesystem", "/"]
+      windows: ["npx", "-y", "@modelcontextprotocol/server-filesystem", "C:\\"]
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-filesystem", "/"]
+    requires_api_key: false
+
+  memory:
+    description: "Persistent memory - store and retrieve information using knowledge graph"
+    keywords: [memory, remember, store, persist, recall, notes, save, knowledge graph]
+    install:
+      mac: ["npx", "-y", "@modelcontextprotocol/server-memory"]
+      linux: ["npx", "-y", "@modelcontextprotocol/server-memory"]
+      wsl: ["npx", "-y", "@modelcontextprotocol/server-memory"]
+      windows: ["npx", "-y", "@modelcontextprotocol/server-memory"]
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-memory"]
+    requires_api_key: false
+
+  fetch:
+    description: "HTTP requests - fetch web pages, APIs with robot.txt compliance"
+    keywords: [http, fetch, request, api, web, download, curl, get, post]
+    install:
+      mac: ["npx", "-y", "@modelcontextprotocol/server-fetch"]
+      linux: ["npx", "-y", "@modelcontextprotocol/server-fetch"]
+      wsl: ["npx", "-y", "@modelcontextprotocol/server-fetch"]
+      windows: ["npx", "-y", "@modelcontextprotocol/server-fetch"]
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-fetch"]
+    requires_api_key: false
+
+  sequential-thinking:
+    description: "Dynamic problem-solving through thought sequences with revision and branching"
+    keywords: [thinking, reasoning, problem solving, sequential, thoughts, analysis]
+    install:
+      mac: ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"]
+      linux: ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"]
+      wsl: ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"]
+      windows: ["npx", "-y", "@modelcontextprotocol/server-sequential-thinking"]
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    requires_api_key: false
+
+  # === Python MCP Servers (uvx) ===
+
+  git:
+    description: "Git operations via MCP - repository management, commits, branches, diffs"
+    keywords: [git, repository, commits, branches, diff, blame, log]
+    install:
+      mac: ["uvx", "mcp-server-git", "--repository", "."]
+      linux: ["uvx", "mcp-server-git", "--repository", "."]
+      wsl: ["uvx", "mcp-server-git", "--repository", "."]
+      windows: ["uvx", "mcp-server-git", "--repository", "."]
+    command: "uvx"
+    args: ["mcp-server-git", "--repository", "."]
+    requires_api_key: false
+
+  sqlite:
+    description: "SQLite database operations - queries, tables, data"
+    keywords: [sqlite, database, sql, query, db, table]
+    install:
+      mac: ["uvx", "mcp-server-sqlite", "--db-path", "./data.db"]
+      linux: ["uvx", "mcp-server-sqlite", "--db-path", "./data.db"]
+      wsl: ["uvx", "mcp-server-sqlite", "--db-path", "./data.db"]
+      windows: ["uvx", "mcp-server-sqlite", "--db-path", "./data.db"]
+    command: "uvx"
+    args: ["mcp-server-sqlite", "--db-path", "./data.db"]
+    requires_api_key: false
+
+  time:
+    description: "Time and timezone operations - current time, timezone conversion"
+    keywords: [time, timezone, clock, date, utc, convert]
+    install:
+      mac: ["uvx", "mcp-server-time"]
+      linux: ["uvx", "mcp-server-time"]
+      wsl: ["uvx", "mcp-server-time"]
+      windows: ["uvx", "mcp-server-time"]
+    command: "uvx"
+    args: ["mcp-server-time"]
+    requires_api_key: false
+
+  # === Databases ===
+
+  postgres:
+    description: "PostgreSQL database operations - queries, tables, schemas"
+    keywords: [postgres, postgresql, database, sql, query, pg]
+    install:
+      mac: ["npx", "-y", "@modelcontextprotocol/server-postgres", "${POSTGRES_URL}"]
+      linux: ["npx", "-y", "@modelcontextprotocol/server-postgres", "${POSTGRES_URL}"]
+      wsl: ["npx", "-y", "@modelcontextprotocol/server-postgres", "${POSTGRES_URL}"]
+      windows: ["npx", "-y", "@modelcontextprotocol/server-postgres", "${POSTGRES_URL}"]
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-postgres", "${POSTGRES_URL}"]
+    requires_api_key: true
+    env_var: "POSTGRES_URL"
+    env_instructions: "PostgreSQL connection string: postgresql://user:pass@host:5432/db"
+
+  qdrant:
+    description: "Qdrant vector database - semantic search, embeddings, RAG"
+    keywords: [qdrant, vector, embeddings, semantic search, rag, similarity]
+    install:
+      mac: ["uvx", "mcp-server-qdrant"]
+      linux: ["uvx", "mcp-server-qdrant"]
+      wsl: ["uvx", "mcp-server-qdrant"]
+      windows: ["uvx", "mcp-server-qdrant"]
+    command: "uvx"
+    args: ["mcp-server-qdrant"]
+    requires_api_key: true
+    env_var: "QDRANT_URL"
+    env_instructions: "Set QDRANT_URL (e.g. http://localhost:6333), COLLECTION_NAME, and optionally QDRANT_API_KEY"
+
+  # === Browser Automation ===
+
+  puppeteer:
+    description: "Headless Chrome automation via Puppeteer"
+    keywords: [puppeteer, chrome, headless, browser, scraping, automation]
+    install:
+      mac: ["npx", "-y", "@modelcontextprotocol/server-puppeteer"]
+      linux: ["npx", "-y", "@modelcontextprotocol/server-puppeteer"]
+      wsl: ["npx", "-y", "@modelcontextprotocol/server-puppeteer"]
+      windows: ["npx", "-y", "@modelcontextprotocol/server-puppeteer"]
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-puppeteer"]
+    requires_api_key: false
+
+  browserbase:
+    description: "Cloud browser automation - headless Chrome with stealth, sessions, recordings"
+    keywords: [browserbase, browser, cloud, headless, automation, stealth]
+    install:
+      mac: ["npx", "-y", "@browserbasehq/mcp-server-browserbase"]
+      linux: ["npx", "-y", "@browserbasehq/mcp-server-browserbase"]
+      wsl: ["npx", "-y", "@browserbasehq/mcp-server-browserbase"]
+      windows: ["npx", "-y", "@browserbasehq/mcp-server-browserbase"]
+    command: "npx"
+    args: ["-y", "@browserbasehq/mcp-server-browserbase"]
+    requires_api_key: true
+    env_var: "BROWSERBASE_API_KEY"
+    env_instructions: "Set BROWSERBASE_API_KEY, BROWSERBASE_PROJECT_ID from https://browserbase.com"
+
+  # === Developer Tools ===
+
+  github:
+    description: "GitHub API - issues, PRs, repos, actions, code search, reviews"
+    keywords: [github, issues, pull request, pr, repository, actions, workflows, code review, commits]
+    install:
+      mac: ["npx", "-y", "@modelcontextprotocol/server-github"]
+      linux: ["npx", "-y", "@modelcontextprotocol/server-github"]
+      wsl: ["npx", "-y", "@modelcontextprotocol/server-github"]
+      windows: ["npx", "-y", "@modelcontextprotocol/server-github"]
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-github"]
+    requires_api_key: true
+    env_var: "GITHUB_PERSONAL_ACCESS_TOKEN"
+    env_instructions: "Create at https://github.com/settings/tokens with repo scope"
+
+  gitlab:
+    description: "GitLab API - projects, merge requests, issues, pipelines"
+    keywords: [gitlab, merge request, mr, repository, pipelines, ci, issues]
+    install:
+      mac: ["npx", "-y", "@modelcontextprotocol/server-gitlab"]
+      linux: ["npx", "-y", "@modelcontextprotocol/server-gitlab"]
+      wsl: ["npx", "-y", "@modelcontextprotocol/server-gitlab"]
+      windows: ["npx", "-y", "@modelcontextprotocol/server-gitlab"]
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-gitlab"]
+    requires_api_key: true
+    env_var: "GITLAB_PERSONAL_ACCESS_TOKEN"
+    env_instructions: "Create at https://gitlab.com/-/profile/personal_access_tokens"
+
+  sentry:
+    description: "Sentry error tracking - issues, events, releases, debugging"
+    keywords: [sentry, errors, monitoring, debugging, exceptions, crashes, logs]
+    install:
+      mac: ["npx", "-y", "@modelcontextprotocol/server-sentry"]
+      linux: ["npx", "-y", "@modelcontextprotocol/server-sentry"]
+      wsl: ["npx", "-y", "@modelcontextprotocol/server-sentry"]
+      windows: ["npx", "-y", "@modelcontextprotocol/server-sentry"]
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-sentry"]
+    requires_api_key: true
+    env_var: "SENTRY_AUTH_TOKEN"
+    env_instructions: "Create at https://sentry.io/settings/account/api/auth-tokens/"
+
+  # === Communication ===
+
+  slack:
+    description: "Slack messaging - channels, DMs, search, notifications"
+    keywords: [slack, messaging, chat, channels, dm, notifications, team]
+    install:
+      mac: ["npx", "-y", "@modelcontextprotocol/server-slack"]
+      linux: ["npx", "-y", "@modelcontextprotocol/server-slack"]
+      wsl: ["npx", "-y", "@modelcontextprotocol/server-slack"]
+      windows: ["npx", "-y", "@modelcontextprotocol/server-slack"]
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-slack"]
+    requires_api_key: true
+    env_var: "SLACK_BOT_TOKEN"
+    env_instructions: "Create Slack app at https://api.slack.com/apps and get Bot Token (xoxb-...)"
+
+  # === Project Management ===
+
+  linear:
+    description: "Linear issue tracking - issues, projects, cycles, teams"
+    keywords: [linear, issues, project management, tickets, bugs, tasks, sprint]
+    install:
+      mac: ["npx", "-y", "@modelcontextprotocol/server-linear"]
+      linux: ["npx", "-y", "@modelcontextprotocol/server-linear"]
+      wsl: ["npx", "-y", "@modelcontextprotocol/server-linear"]
+      windows: ["npx", "-y", "@modelcontextprotocol/server-linear"]
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-linear"]
+    requires_api_key: true
+    env_var: "LINEAR_API_KEY"
+    env_instructions: "Create at https://linear.app/settings/api"
+
+  # === Knowledge & Docs ===
+
+  notion:
+    description: "Notion workspace - pages, databases, search, blocks"
+    keywords: [notion, wiki, documentation, pages, databases, notes, workspace]
+    install:
+      mac: ["npx", "-y", "@notionhq/notion-mcp-server"]
+      linux: ["npx", "-y", "@notionhq/notion-mcp-server"]
+      wsl: ["npx", "-y", "@notionhq/notion-mcp-server"]
+      windows: ["npx", "-y", "@notionhq/notion-mcp-server"]
+    command: "npx"
+    args: ["-y", "@notionhq/notion-mcp-server"]
+    requires_api_key: true
+    env_var: "NOTION_TOKEN"
+    env_instructions: "Create integration at https://www.notion.so/my-integrations (token starts with ntn_)"
+
+  # === Cloud Storage ===
+
+  google-drive:
+    description: "Google Drive - files, folders, search, sharing, docs, sheets"
+    keywords: [google drive, gdrive, docs, sheets, files, cloud storage, google]
+    install:
+      mac: ["npx", "-y", "@modelcontextprotocol/server-gdrive"]
+      linux: ["npx", "-y", "@modelcontextprotocol/server-gdrive"]
+      wsl: ["npx", "-y", "@modelcontextprotocol/server-gdrive"]
+      windows: ["npx", "-y", "@modelcontextprotocol/server-gdrive"]
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-gdrive"]
+    requires_api_key: true
+    env_var: "GDRIVE_CREDENTIALS"
+    env_instructions: "OAuth flow required - see https://github.com/modelcontextprotocol/servers/tree/main/src/gdrive"
+
+  google-maps:
+    description: "Google Maps API - geocoding, directions, places, search"
+    keywords: [google maps, maps, geocoding, directions, places, location, gps]
+    install:
+      mac: ["npx", "-y", "@modelcontextprotocol/server-google-maps"]
+      linux: ["npx", "-y", "@modelcontextprotocol/server-google-maps"]
+      wsl: ["npx", "-y", "@modelcontextprotocol/server-google-maps"]
+      windows: ["npx", "-y", "@modelcontextprotocol/server-google-maps"]
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-google-maps"]
+    requires_api_key: true
+    env_var: "GOOGLE_MAPS_API_KEY"
+    env_instructions: "Get API key at https://console.cloud.google.com/google/maps-apis"
+
+  # === Search & Data ===
+
+  brave-search:
+    description: "Brave Search API - web search, local search, news"
+    keywords: [brave, search, web search, news, local search]
+    install:
+      mac: ["npx", "-y", "@modelcontextprotocol/server-brave-search"]
+      linux: ["npx", "-y", "@modelcontextprotocol/server-brave-search"]
+      wsl: ["npx", "-y", "@modelcontextprotocol/server-brave-search"]
+      windows: ["npx", "-y", "@modelcontextprotocol/server-brave-search"]
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-brave-search"]
+    requires_api_key: true
+    env_var: "BRAVE_API_KEY"
+    env_instructions: "Get API key at https://brave.com/search/api/"
+
+  exa:
+    description: "Exa AI search - neural search, similar pages, content extraction"
+    keywords: [exa, search, neural search, ai search, semantic search]
+    install:
+      mac: ["npx", "-y", "exa-mcp-server"]
+      linux: ["npx", "-y", "exa-mcp-server"]
+      wsl: ["npx", "-y", "exa-mcp-server"]
+      windows: ["npx", "-y", "exa-mcp-server"]
+    command: "npx"
+    args: ["-y", "exa-mcp-server"]
+    requires_api_key: true
+    env_var: "EXA_API_KEY"
+    env_instructions: "Get API key at https://dashboard.exa.ai/api-keys"
+
+  # === AI & LLM ===
+
+  everart:
+    description: "AI image generation via EverArt"
+    keywords: [image, ai, generation, art, everart, picture, create]
+    install:
+      mac: ["npx", "-y", "@modelcontextprotocol/server-everart"]
+      linux: ["npx", "-y", "@modelcontextprotocol/server-everart"]
+      wsl: ["npx", "-y", "@modelcontextprotocol/server-everart"]
+      windows: ["npx", "-y", "@modelcontextprotocol/server-everart"]
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-everart"]
+    requires_api_key: true
+    env_var: "EVERART_API_KEY"
+    env_instructions: "Get API key at https://everart.ai"
+
+  # === Finance & Data ===
+
+  coinmarketcap:
+    description: "Cryptocurrency market data from CoinMarketCap"
+    keywords: [crypto, cryptocurrency, bitcoin, ethereum, market, prices, coinmarketcap]
+    install:
+      mac: ["npx", "-y", "@shinzolabs/coinmarketcap-mcp"]
+      linux: ["npx", "-y", "@shinzolabs/coinmarketcap-mcp"]
+      wsl: ["npx", "-y", "@shinzolabs/coinmarketcap-mcp"]
+      windows: ["npx", "-y", "@shinzolabs/coinmarketcap-mcp"]
+    command: "npx"
+    args: ["-y", "@shinzolabs/coinmarketcap-mcp"]
+    requires_api_key: true
+    env_var: "COINMARKETCAP_API_KEY"
+    env_instructions: "Get API key at https://coinmarketcap.com/api/ (free Basic tier available)"
+
+  # === AWS ===
+
+  aws-kb-retrieval:
+    description: "AWS Bedrock Knowledge Bases - RAG with AWS managed vector stores"
+    keywords: [aws, bedrock, knowledge base, rag, retrieval, amazon]
+    install:
+      mac: ["npx", "-y", "@modelcontextprotocol/server-aws-kb-retrieval"]
+      linux: ["npx", "-y", "@modelcontextprotocol/server-aws-kb-retrieval"]
+      wsl: ["npx", "-y", "@modelcontextprotocol/server-aws-kb-retrieval"]
+      windows: ["npx", "-y", "@modelcontextprotocol/server-aws-kb-retrieval"]
+    command: "npx"
+    args: ["-y", "@modelcontextprotocol/server-aws-kb-retrieval"]
+    requires_api_key: true
+    env_var: "AWS_ACCESS_KEY_ID"
+    env_instructions: "Set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION"
+
+# Discovery queue location
+discovery_queue_path: ".mcp-gateway/discovery_queue.json"

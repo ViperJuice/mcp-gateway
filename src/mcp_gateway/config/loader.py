@@ -12,6 +12,7 @@ from mcp_gateway.types import McpConfigFile, McpServerConfig, ResolvedServerConf
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+    from mcp_gateway.manifest.loader import ServerConfig as ManifestServerConfig
 
 logger = logging.getLogger(__name__)
 
@@ -161,3 +162,30 @@ def load_configs(
 
     logger.info(f"Loaded {len(configs)} server configs from {len(seen_servers)} unique servers")
     return configs
+
+
+def manifest_server_to_config(server: "ManifestServerConfig") -> ResolvedServerConfig:
+    """Convert a manifest ServerConfig to a ResolvedServerConfig.
+
+    Args:
+        server: Server configuration from manifest.yaml
+
+    Returns:
+        ResolvedServerConfig compatible with ClientManager
+    """
+    # Build env dict if server requires API key
+    env: dict[str, str] | None = None
+    if server.env_var:
+        env_value = os.environ.get(server.env_var, "")
+        if env_value:
+            env = {server.env_var: env_value}
+
+    return ResolvedServerConfig(
+        name=server.name,
+        source="manifest",
+        config=McpServerConfig(
+            command=server.command,
+            args=server.args,
+            env=env,
+        ),
+    )

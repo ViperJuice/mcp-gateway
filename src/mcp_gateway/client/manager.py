@@ -354,6 +354,116 @@ class ClientManager:
         await self.disconnect_all()
         return await self.connect_all(configs)
 
+    async def adopt_process(
+        self,
+        name: str,
+        process: asyncio.subprocess.Process,
+        config: ResolvedServerConfig,
+    ) -> None:
+        """Adopt an already-running subprocess as a managed MCP client.
+
+        Used when npx-based servers start during installation.
+        The process must have stdin/stdout pipes available.
+
+        Args:
+            name: Server name
+            process: Running subprocess with stdin/stdout pipes
+            config: Server configuration
+
+        Raises:
+            RuntimeError: If process is not running or missing pipes
+            Exception: If MCP initialization fails
+        """
+        # Validate process state
+        if process.returncode is not None:
+            raise RuntimeError(f"Process for {name} has already exited")
+        if not process.stdin:
+            raise RuntimeError(f"Process for {name} has no stdin pipe")
+        if not process.stdout:
+            raise RuntimeError(f"Process for {name} has no stdout pipe")
+
+        logger.info(f"Adopting process for MCP server: {name}")
+
+        # Initialize status
+        status = ServerStatus(
+            name=name,
+            status=ServerStatusEnum.CONNECTING,
+            tool_count=0,
+        )
+        self._servers[name] = status
+
+        managed = ManagedClient(
+            config=config,
+            process=process,
+            status=status,
+        )
+        self._clients[name] = managed
+
+        # Start reading stderr in background (if available)
+        if process.stderr:
+            asyncio.create_task(self._read_stderr(name, process.stderr))
+
+        try:
+            # Start reading stdout for JSON-RPC responses
+            managed.read_task = asyncio.create_task(self._read_stdout(name, managed))
+
+            # Initialize MCP connection
+            await self._send_initialize(managed)
+
+            # List tools
+            tools_result = await self._send_request(managed, "tools/list", {})
+            tools = tools_result.get("tools", [])
+
+            # Index tools
+            indexed = 0
+            for tool in tools:
+                if indexed >= self._max_tools_per_server:
+                    logger.warning(
+                        f"Server {name} has more than {self._max_tools_per_server} tools, truncating"
+                    )
+                    break
+
+                tool_id = make_tool_id(name, tool["name"])
+                description = tool.get("description", "")
+
+                tool_info = ToolInfo(
+                    tool_id=tool_id,
+                    server_name=name,
+                    tool_name=tool["name"],
+                    description=description,
+                    short_description=_truncate_description(description),
+                    input_schema=tool.get("inputSchema", {}),
+                    tags=_extract_tags(name, tool["name"], description),
+                    risk_hint=_infer_risk_hint(tool["name"], description),
+                )
+
+                self._tools[tool_id] = tool_info
+                indexed += 1
+
+            # Update status
+            status.status = ServerStatusEnum.ONLINE
+            status.tool_count = indexed
+            status.last_connected_at = time.time()
+
+            # Update revision
+            self._revision_id = _generate_revision_id()
+            self._last_refresh_ts = time.time()
+
+            logger.info(f"Adopted {name}: {indexed} tools indexed")
+
+        except Exception as e:
+            status.status = ServerStatusEnum.ERROR
+            status.last_error = str(e)
+            # Clean up on failure
+            if managed.read_task:
+                managed.read_task.cancel()
+            if process.returncode is None:
+                process.kill()
+            # Remove from registries
+            self._clients.pop(name, None)
+            self._servers.pop(name, None)
+            raise
+
     async def call_tool(
         self, tool_id: str, args: dict[str, Any], timeout_ms: int = 30000
     ) -> Any:

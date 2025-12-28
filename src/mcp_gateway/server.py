@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 from pathlib import Path
 from typing import Any
 
@@ -11,10 +12,17 @@ from mcp.server import Server
 from mcp.types import TextContent, Tool
 
 from mcp_gateway.client.manager import ClientManager
-from mcp_gateway.config.loader import load_configs
+from mcp_gateway.config.loader import load_configs, manifest_server_to_config
+from mcp_gateway.manifest.loader import load_manifest
+from mcp_gateway.manifest.refresher import (
+    get_cache_path,
+    load_descriptions_cache,
+    refresh_all,
+)
 from mcp_gateway.policy.policy import PolicyManager
 from mcp_gateway.summary import generate_capability_summary
 from mcp_gateway.tools.handlers import GatewayTools, get_gateway_tool_definitions
+from mcp_gateway.types import DescriptionsCache
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +35,11 @@ class GatewayServer:
         project_root: Path | None = None,
         custom_config_path: Path | None = None,
         policy_path: Path | None = None,
+        cache_dir: Path | None = None,
     ) -> None:
         self._project_root = project_root
         self._custom_config_path = custom_config_path
+        self._cache_dir = cache_dir or Path(".mcp-gateway")
 
         # Initialize policy manager
         self._policy_manager = PolicyManager(policy_path)
@@ -50,6 +60,9 @@ class GatewayServer:
         # Server will be created after initialization with capability summary
         self._server: Server | None = None
         self._capability_summary: str = ""
+
+        # Pre-built descriptions cache
+        self._descriptions_cache: DescriptionsCache | None = None
 
     def _create_server(self, instructions: str | None = None) -> None:
         """Create the MCP server with optional capability instructions."""
@@ -80,6 +93,14 @@ class GatewayServer:
                     result = await self._gateway_tools.refresh(arguments)
                 elif name == "gateway.health":
                     result = await self._gateway_tools.health()
+                elif name == "gateway.request_capability":
+                    result = await self._gateway_tools.request_capability(arguments)
+                elif name == "gateway.sync_environment":
+                    result = await self._gateway_tools.sync_environment(arguments)
+                elif name == "gateway.provision":
+                    result = await self._gateway_tools.provision(arguments)
+                elif name == "gateway.provision_status":
+                    result = await self._gateway_tools.provision_status(arguments)
                 else:
                     raise ValueError(f"Unknown tool: {name}")
 
@@ -102,11 +123,54 @@ class GatewayServer:
         """Initialize connections to downstream servers and generate capability summary."""
         logger.info("Initializing MCP Gateway...")
 
-        # Load configs
+        # Load pre-built descriptions cache
+        cache_path = get_cache_path(self._cache_dir)
+        self._descriptions_cache = load_descriptions_cache(cache_path)
+
+        if self._descriptions_cache:
+            logger.info(
+                f"Loaded pre-built descriptions for {len(self._descriptions_cache.servers)} servers"
+            )
+        else:
+            logger.info("No pre-built descriptions cache found")
+
+        # Load configs from .mcp.json files
         configs = load_configs(
             project_root=self._project_root,
             custom_config_path=self._custom_config_path,
         )
+
+        # Filter out the gateway itself to prevent recursive connection
+        configs = [c for c in configs if c.name != "mcp-gateway"]
+        seen_servers = {c.name for c in configs}
+
+        # Load manifest and add auto-start servers (if not already configured)
+        manifest = None
+        try:
+            manifest = load_manifest()
+            auto_start_servers = manifest.get_auto_start_servers()
+
+            for server in auto_start_servers:
+                if server.name in seen_servers:
+                    logger.debug(f"Skipping manifest server '{server.name}' - already in .mcp.json")
+                    continue
+
+                # Skip servers that require API keys if not set
+                if server.requires_api_key and server.env_var:
+                    if not os.environ.get(server.env_var):
+                        logger.info(
+                            f"Skipping auto-start server '{server.name}' - "
+                            f"missing {server.env_var} (set in .env)"
+                        )
+                        continue
+
+                # Add manifest server to configs
+                configs.append(manifest_server_to_config(server))
+                seen_servers.add(server.name)
+                logger.info(f"Added auto-start server from manifest: {server.name}")
+
+        except Exception as e:
+            logger.warning(f"Failed to load manifest auto-start servers: {e}")
 
         # Filter by policy
         allowed_configs = [
@@ -133,8 +197,27 @@ class GatewayServer:
         )
 
         # Generate capability summary for MCP instructions
+        # Try pre-built cache first, then LLM, then template
         logger.info("Generating capability summary...")
-        self._capability_summary = await generate_capability_summary(tools)
+        self._capability_summary = await generate_capability_summary(
+            tools, cache=self._descriptions_cache
+        )
+
+        # If no cache and we have tools, auto-generate cache for next time
+        if not self._descriptions_cache and tools and manifest:
+            logger.info("Auto-generating descriptions cache for future startups...")
+            try:
+                # Only cache for connected servers (auto_start ones)
+                connected_names = [s.name for s in statuses if s.status.value == "online"]
+                self._descriptions_cache = await refresh_all(
+                    manifest=manifest,
+                    cache_path=cache_path,
+                    servers=connected_names,
+                )
+                logger.info(f"Cached descriptions for {len(self._descriptions_cache.servers)} servers")
+            except Exception as e:
+                logger.warning(f"Failed to auto-generate cache: {e}")
+
         logger.debug("Capability summary:\n%s", self._capability_summary)
 
         # Create MCP server with capability instructions

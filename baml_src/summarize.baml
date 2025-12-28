@@ -38,3 +38,34 @@ function SummarizeCapabilities(tools: ToolDescription[]) -> CapabilitySummary {
     {{ ctx.output_format }}
   "#
 }
+
+test TestName {
+  functions [SummarizeCapabilities]
+  args {
+    tools [
+      {
+          server_name #"
+          hello world
+        "#
+          tool_name #"
+          hello world
+        "#
+          description #"
+          hello world
+        "#
+      },
+      {
+          server_name #"
+          hello world
+        "#
+          tool_name #"
+          hello world
+        "#
+          description #"
+          hello world
+        "#
+      }
+    ]
+  }
+}
+
