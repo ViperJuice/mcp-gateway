@@ -81,7 +81,7 @@ def test_manifest_has_expected_servers():
     """Test that manifest has expected servers."""
     manifest = load_manifest()
 
-    expected_servers = ["playwright", "context7", "brightdata-scraper", "brightdata-serp"]
+    expected_servers = ["playwright", "context7", "memory", "filesystem"]
     for server in expected_servers:
         assert server in manifest.servers, f"Missing server: {server}"
 

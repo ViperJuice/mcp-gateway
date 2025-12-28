@@ -496,11 +496,42 @@ class GatewayTools:
         logger.info(f"Refresh requested: {parsed.reason or 'manual refresh'}")
 
         try:
-            # Reload configs
+            # Reload configs from .mcp.json files
             configs = load_configs(
                 project_root=self._project_root,
                 custom_config_path=self._custom_config_path,
             )
+
+            # Filter out the gateway itself to prevent recursive connection
+            configs = [c for c in configs if c.name != "mcp-gateway"]
+            seen_servers = {c.name for c in configs}
+
+            # Load manifest and add auto-start servers (if not already configured)
+            try:
+                manifest = load_manifest()
+                auto_start_servers = manifest.get_auto_start_servers()
+
+                for server in auto_start_servers:
+                    if server.name in seen_servers:
+                        logger.debug(f"Skipping manifest server '{server.name}' - already in .mcp.json")
+                        continue
+
+                    # Skip servers that require API keys if not set
+                    if server.requires_api_key and server.env_var:
+                        if not os.environ.get(server.env_var):
+                            logger.info(
+                                f"Skipping auto-start server '{server.name}' - "
+                                f"missing {server.env_var}"
+                            )
+                            continue
+
+                    # Add manifest server to configs
+                    configs.append(manifest_server_to_config(server))
+                    seen_servers.add(server.name)
+                    logger.info(f"Added auto-start server from manifest: {server.name}")
+
+            except Exception as e:
+                logger.warning(f"Failed to load manifest auto-start servers: {e}")
 
             # Filter by policy
             allowed_configs = [

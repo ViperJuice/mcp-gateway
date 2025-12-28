@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -232,16 +233,27 @@ class GatewayServer:
         if self._server is None:
             raise RuntimeError("Server not initialized after initialization")
 
-        async with stdio_server() as (read_stream, write_stream):
-            logger.info("MCP Gateway server started")
-            await self._server.run(
-                read_stream,
-                write_stream,
-                self._server.create_initialization_options(),
-            )
+        try:
+            async with stdio_server() as (read_stream, write_stream):
+                logger.info("MCP Gateway server started")
+                await self._server.run(
+                    read_stream,
+                    write_stream,
+                    self._server.create_initialization_options(),
+                )
+        finally:
+            await self.shutdown()
 
     async def shutdown(self) -> None:
         """Shutdown the server."""
         logger.info("Shutting down MCP Gateway...")
-        await self._client_manager.disconnect_all()
+        try:
+            await asyncio.wait_for(
+                self._client_manager.disconnect_all(),
+                timeout=10.0
+            )
+        except asyncio.TimeoutError:
+            logger.warning("Shutdown timed out, forcing disconnect")
+        except Exception as e:
+            logger.error(f"Error during shutdown: {e}")
         logger.info("MCP Gateway shut down")

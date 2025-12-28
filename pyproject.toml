@@ -10,9 +10,10 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.10"
 authors = [
-    { name = "Your Name", email = "you@example.com" }
+    { name = "ViperJuice", email = "viperjuice@users.noreply.github.com" }
 ]
-keywords = ["mcp", "claude", "gateway", "anthropic"]
+keywords = ["mcp", "claude", "gateway", "anthropic", "llm", "ai"]
+
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -30,10 +31,18 @@ dependencies = [
     "aiohttp>=3.9.0",
 ]
 
+[project.urls]
+Repository = "https://github.com/ViperJuice/mcp-gateway"
+Homepage = "https://github.com/ViperJuice/mcp-gateway"
+Issues = "https://github.com/ViperJuice/mcp-gateway/issues"
+
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",
+    "pytest-cov>=4.0",
+    "ruff>=0.8.0",
+    "mypy>=1.0",
 ]
 llm = [
     "baml-py>=0.215.0",
@@ -51,3 +60,14 @@ packages = ["src/mcp_gateway"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["src/mcp_gateway"]
+omit = ["src/mcp_gateway/baml_client/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]

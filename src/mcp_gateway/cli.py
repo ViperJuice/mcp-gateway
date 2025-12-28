@@ -223,12 +223,20 @@ async def run_server(args: argparse.Namespace) -> None:
             return_when=asyncio.FIRST_COMPLETED,
         )
 
+        # Cancel pending tasks and await them properly
         for task in pending:
             task.cancel()
 
-        if shutdown_event.is_set():
-            await server.shutdown()
+        # Wait for cancelled tasks to complete with timeout
+        if pending:
+            await asyncio.wait(pending, timeout=5.0)
 
+        # Check if server task raised an exception
+        if server_task in done and server_task.exception():
+            raise server_task.exception()
+
+    except asyncio.CancelledError:
+        logger.info("Server cancelled")
     except Exception as e:
         logger.error(f"Fatal error: {e}")
         raise

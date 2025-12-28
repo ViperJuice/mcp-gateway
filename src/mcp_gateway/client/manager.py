@@ -255,6 +255,7 @@ class ClientManager:
             while True:
                 line = await managed.process.stdout.readline()
                 if not line:
+                    # EOF - server process has exited
                     break
 
                 try:
@@ -272,6 +273,17 @@ class ClientManager:
                     logger.debug(f"[{name}] Non-JSON output: {line.decode().strip()}")
         except Exception as e:
             logger.debug(f"[{name}] Read error: {e}")
+        finally:
+            # Mark server as offline when stdout closes
+            if managed.status.status == ServerStatusEnum.ONLINE:
+                logger.warning(f"Server {name} disconnected unexpectedly")
+                managed.status.status = ServerStatusEnum.ERROR
+                managed.status.last_error = "Server process exited"
+            # Cancel any pending requests
+            for request_id, future in list(managed.pending_requests.items()):
+                if not future.done():
+                    future.set_exception(ConnectionError(f"Server {name} disconnected"))
+            managed.pending_requests.clear()
 
     async def _send_request(
         self, managed: ManagedClient, method: str, params: dict[str, Any]
@@ -334,8 +346,25 @@ class ClientManager:
         for name, managed in self._clients.items():
             try:
                 logger.info(f"Disconnecting from {name}")
+
+                # Cancel pending requests first
+                for request_id, future in list(managed.pending_requests.items()):
+                    if not future.done():
+                        future.cancel()
+                managed.pending_requests.clear()
+
+                # Cancel read task
                 if managed.read_task:
                     managed.read_task.cancel()
+                    try:
+                        await asyncio.wait_for(
+                            asyncio.shield(managed.read_task),
+                            timeout=1.0
+                        )
+                    except (asyncio.TimeoutError, asyncio.CancelledError):
+                        pass
+
+                # Terminate process
                 if managed.process and managed.process.returncode is None:
                     managed.process.terminate()
                     try:
