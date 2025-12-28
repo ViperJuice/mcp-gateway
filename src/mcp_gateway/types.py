@@ -137,6 +137,13 @@ class ArgInfo(BaseModel):
     examples: list[Any] | None = None
 
 
+class InvokeTemplate(BaseModel):
+    """Template for invoking a tool via gateway.invoke."""
+
+    tool_id: str
+    arguments: dict[str, str]  # arg_name -> description placeholder
+
+
 class SchemaCard(BaseModel):
     """Detailed tool information for describe output."""
 
@@ -146,6 +153,9 @@ class SchemaCard(BaseModel):
     args: list[ArgInfo]
     constraints: list[str] | None = None
     safety_notes: list[str] | None = None
+    # Direct invocation template
+    invoke_as: str = "gateway.invoke"
+    invoke_template: InvokeTemplate | None = None
 
 
 class InvokeOptions(BaseModel):

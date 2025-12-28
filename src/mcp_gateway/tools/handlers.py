@@ -20,6 +20,7 @@ from mcp_gateway.types import (
     HealthOutput,
     InvokeInput,
     InvokeOutput,
+    InvokeTemplate,
     RefreshInput,
     RefreshOutput,
     SchemaCard,
@@ -307,12 +308,26 @@ class GatewayTools:
         if tool_info.risk_hint.value == "high":
             safety_notes.append("This tool may modify data or have side effects.")
 
+        # Build invoke template for direct invocation
+        arg_placeholders: dict[str, str] = {}
+        for arg in args:
+            if arg.required:
+                arg_placeholders[arg.name] = f"<required: {arg.type}>"
+            else:
+                arg_placeholders[arg.name] = f"<optional: {arg.type}>"
+
+        invoke_template = InvokeTemplate(
+            tool_id=tool_info.tool_id,
+            arguments=arg_placeholders,
+        )
+
         return SchemaCard(
             server=tool_info.server_name,
             tool_name=tool_info.tool_name,
             description=tool_info.description,
             args=args,
             safety_notes=safety_notes if safety_notes else None,
+            invoke_template=invoke_template,
         )
 
     async def invoke(self, input_data: dict[str, Any]) -> InvokeOutput:

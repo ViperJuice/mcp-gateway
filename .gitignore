@@ -50,3 +50,6 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+
+# BAML generated client
+src/mcp_gateway/baml_client/

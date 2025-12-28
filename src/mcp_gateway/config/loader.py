@@ -117,7 +117,7 @@ def load_configs(
                     seen_servers.add(name)
 
     # 2. Load user configs
-    user_paths = list(user_config_paths) if user_config_paths else DEFAULT_USER_CONFIG_PATHS
+    user_paths = list(user_config_paths) if user_config_paths is not None else DEFAULT_USER_CONFIG_PATHS
     for user_path in user_paths:
         user_config = parse_json_file(user_path)
 

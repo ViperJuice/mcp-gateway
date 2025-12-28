@@ -1,0 +1,214 @@
+"""Integration tests for MCP Gateway.
+
+These tests require real MCP servers configured in ~/.mcp.json.
+Skip with: pytest tests/test_integration.py -v --skip-integration
+"""
+
+from __future__ import annotations
+
+import asyncio
+import os
+import pytest
+
+from mcp_gateway.config.loader import load_configs
+from mcp_gateway.client.manager import ClientManager
+from mcp_gateway.policy.policy import PolicyManager
+from mcp_gateway.summary import generate_capability_summary
+from mcp_gateway.summary.template_fallback import template_summary
+from mcp_gateway.server import GatewayServer
+
+
+# Skip integration tests if no MCP servers configured
+def has_mcp_servers() -> bool:
+    """Check if there are MCP servers configured."""
+    configs = load_configs()
+    return len(configs) > 0
+
+
+skip_no_servers = pytest.mark.skipif(
+    not has_mcp_servers(),
+    reason="No MCP servers configured in ~/.mcp.json"
+)
+
+
+class TestConfigLoading:
+    """Test config loading from real files."""
+
+    def test_loads_user_config(self) -> None:
+        """Verify we can load configs from ~/.mcp.json."""
+        configs = load_configs()
+        # Should find at least user configs
+        assert isinstance(configs, list)
+
+        # Print what was found for debugging
+        for cfg in configs:
+            print(f"  Found: {cfg.name} ({cfg.source})")
+
+
+@skip_no_servers
+class TestServerConnection:
+    """Test connecting to real MCP servers."""
+
+    @pytest.mark.asyncio
+    async def test_connects_to_servers(self) -> None:
+        """Test connecting to configured MCP servers."""
+        configs = load_configs()
+        policy = PolicyManager()
+
+        allowed = [c for c in configs if policy.is_server_allowed(c.name)]
+        assert len(allowed) > 0, "No allowed servers"
+
+        manager = ClientManager()
+        try:
+            errors = await manager.connect_all(allowed)
+
+            # Check what connected
+            statuses = manager.get_all_server_statuses()
+            for status in statuses:
+                print(f"  {status.name}: {status.status.value} ({status.tool_count} tools)")
+
+            # At least some should connect (network might be slow)
+            online = [s for s in statuses if s.status.value == "online"]
+            assert len(online) > 0 or len(errors) > 0, "No servers online and no errors"
+
+        finally:
+            await manager.disconnect_all()
+
+    @pytest.mark.asyncio
+    async def test_lists_tools_from_servers(self) -> None:
+        """Test listing tools from connected servers."""
+        configs = load_configs()
+        policy = PolicyManager()
+
+        allowed = [c for c in configs if policy.is_server_allowed(c.name)]
+        manager = ClientManager()
+
+        try:
+            await manager.connect_all(allowed)
+            tools = manager.get_all_tools()
+
+            print(f"  Found {len(tools)} tools total")
+            for tool in tools[:10]:  # First 10
+                print(f"    {tool.tool_id}: {tool.short_description[:50]}...")
+
+            # Should have at least some tools
+            assert len(tools) > 0, "No tools found"
+
+        finally:
+            await manager.disconnect_all()
+
+
+@skip_no_servers
+class TestSummaryGeneration:
+    """Test summary generation with real tools."""
+
+    @pytest.mark.asyncio
+    async def test_template_summary_with_real_tools(self) -> None:
+        """Test template fallback generates summary for real tools."""
+        configs = load_configs()
+        policy = PolicyManager()
+
+        allowed = [c for c in configs if policy.is_server_allowed(c.name)]
+        manager = ClientManager()
+
+        try:
+            await manager.connect_all(allowed)
+            tools = manager.get_all_tools()
+
+            if not tools:
+                pytest.skip("No tools available")
+
+            summary = template_summary(tools)
+
+            print(f"\nTemplate Summary:\n{summary}")
+
+            assert "MCP Gateway capabilities:" in summary
+            assert "gateway.catalog_search" in summary
+
+        finally:
+            await manager.disconnect_all()
+
+    @pytest.mark.asyncio
+    async def test_generate_capability_summary_fallback(self) -> None:
+        """Test generate_capability_summary falls back to template."""
+        configs = load_configs()
+        policy = PolicyManager()
+
+        allowed = [c for c in configs if policy.is_server_allowed(c.name)]
+        manager = ClientManager()
+
+        try:
+            await manager.connect_all(allowed)
+            tools = manager.get_all_tools()
+
+            if not tools:
+                pytest.skip("No tools available")
+
+            # With use_llm=False, should use template
+            summary = await generate_capability_summary(tools, use_llm=False)
+
+            print(f"\nFallback Summary:\n{summary}")
+
+            assert len(summary) > 0
+            assert "gateway" in summary.lower()
+
+        finally:
+            await manager.disconnect_all()
+
+
+@skip_no_servers
+class TestGatewayServer:
+    """Test full gateway server initialization."""
+
+    @pytest.mark.asyncio
+    async def test_gateway_initializes(self) -> None:
+        """Test that gateway server initializes successfully."""
+        server = GatewayServer()
+
+        try:
+            await server.initialize()
+
+            # Check that capability summary was generated
+            assert server._capability_summary, "No capability summary generated"
+            print(f"\nCapability Summary:\n{server._capability_summary}")
+
+            # Check that MCP server was created with instructions
+            assert server._server is not None, "MCP server not created"
+
+        finally:
+            await server.shutdown()
+
+
+@skip_no_servers
+class TestBAMLSummarization:
+    """Test BAML LLM summarization (requires GROQ_API_KEY)."""
+
+    @pytest.mark.asyncio
+    async def test_baml_summarization(self) -> None:
+        """Test BAML summarization with real API."""
+        if not os.environ.get("GROQ_API_KEY"):
+            pytest.skip("GROQ_API_KEY not set")
+
+        configs = load_configs()
+        policy = PolicyManager()
+
+        allowed = [c for c in configs if policy.is_server_allowed(c.name)]
+        manager = ClientManager()
+
+        try:
+            await manager.connect_all(allowed)
+            tools = manager.get_all_tools()
+
+            if not tools:
+                pytest.skip("No tools available")
+
+            # With use_llm=True, should use BAML
+            summary = await generate_capability_summary(tools, use_llm=True)
+
+            print(f"\nBAML LLM Summary:\n{summary}")
+
+            assert "MCP Gateway capabilities:" in summary
+            assert len(summary) > 50  # Should be a real summary
+
+        finally:
+            await manager.disconnect_all()

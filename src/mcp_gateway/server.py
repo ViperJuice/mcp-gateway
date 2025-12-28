@@ -13,6 +13,7 @@ from mcp.types import TextContent, Tool
 from mcp_gateway.client.manager import ClientManager
 from mcp_gateway.config.loader import load_configs
 from mcp_gateway.policy.policy import PolicyManager
+from mcp_gateway.summary import generate_capability_summary
 from mcp_gateway.tools.handlers import GatewayTools, get_gateway_tool_definitions
 
 logger = logging.getLogger(__name__)
@@ -46,12 +47,19 @@ class GatewayServer:
             custom_config_path=custom_config_path,
         )
 
-        # Create MCP server
-        self._server = Server("mcp-gateway")
+        # Server will be created after initialization with capability summary
+        self._server: Server | None = None
+        self._capability_summary: str = ""
+
+    def _create_server(self, instructions: str | None = None) -> None:
+        """Create the MCP server with optional capability instructions."""
+        self._server = Server("mcp-gateway", instructions=instructions)
         self._setup_handlers()
 
     def _setup_handlers(self) -> None:
         """Set up MCP request handlers."""
+        if self._server is None:
+            raise RuntimeError("Server not initialized")
 
         @self._server.list_tools()
         async def list_tools() -> list[Tool]:
@@ -91,7 +99,7 @@ class GatewayServer:
                 ]
 
     async def initialize(self) -> None:
-        """Initialize connections to downstream servers."""
+        """Initialize connections to downstream servers and generate capability summary."""
         logger.info("Initializing MCP Gateway...")
 
         # Load configs
@@ -118,17 +126,28 @@ class GatewayServer:
 
         statuses = self._client_manager.get_all_server_statuses()
         online = sum(1 for s in statuses if s.status.value == "online")
-        total_tools = len(self._client_manager.get_all_tools())
+        tools = self._client_manager.get_all_tools()
 
         logger.info(
-            f"Gateway initialized: {online}/{len(statuses)} servers online, {total_tools} tools indexed"
+            f"Gateway initialized: {online}/{len(statuses)} servers online, {len(tools)} tools indexed"
         )
+
+        # Generate capability summary for MCP instructions
+        logger.info("Generating capability summary...")
+        self._capability_summary = await generate_capability_summary(tools)
+        logger.debug("Capability summary:\n%s", self._capability_summary)
+
+        # Create MCP server with capability instructions
+        self._create_server(instructions=self._capability_summary)
 
     async def run(self) -> None:
         """Run the MCP server (stdio transport)."""
         from mcp.server.stdio import stdio_server
 
         await self.initialize()
+
+        if self._server is None:
+            raise RuntimeError("Server not initialized after initialization")
 
         async with stdio_server() as (read_stream, write_stream):
             logger.info("MCP Gateway server started")
