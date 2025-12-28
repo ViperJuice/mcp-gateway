@@ -1,19 +1,20 @@
 {
   "mcpServers": {
-    "github": {
-      "command": "mcp-server-github",
-      "args": [],
-      "env": {
-        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
-      }
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"]
     },
     "filesystem": {
-      "command": "mcp-server-filesystem",
-      "args": ["/home/user/projects"]
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/allowed/dir"]
     },
-    "sqlite": {
-      "command": "mcp-server-sqlite",
-      "args": ["--db", "./data/app.db"]
+    "fetch": {
+      "command": "uvx",
+      "args": ["mcp-server-fetch"]
     }
   }
 }
