@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "mcp-gateway"
+name = "gateway-mcp"
 version = "1.0.0"
 description = "MCP Gateway - A meta-server for minimal Claude Code tool bloat with progressive disclosure"
 readme = "README.md"
@@ -48,7 +48,7 @@ llm = [
     "baml-py>=0.215.0",
 ]
 all = [
-    "mcp-gateway[dev,llm]",
+    "gateway-mcp[dev,llm]",
 ]
 
 [project.scripts]
