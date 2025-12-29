@@ -58,6 +58,17 @@ class ServerStatusEnum(str, Enum):
     ERROR = "error"
 
 
+class RequestState(str, Enum):
+    """State of a pending request."""
+
+    PENDING = "pending"  # Awaiting response
+    ACTIVE = "active"  # Received partial output (heartbeat)
+    STALLED = "stalled"  # No heartbeat for threshold period
+    COMPLETED = "completed"  # Successfully resolved
+    CANCELLED = "cancelled"  # User cancelled
+    TIMEOUT = "timeout"  # Hard timeout reached
+
+
 class ToolInfo(BaseModel):
     """Internal tool information."""
 
@@ -79,6 +90,10 @@ class ServerStatus(BaseModel):
     tool_count: int
     last_error: str | None = None
     last_connected_at: float | None = None
+    # Health monitoring fields
+    pending_request_count: int = 0  # Number of in-flight requests
+    last_activity_at: float | None = None  # Last heartbeat from server
+    avg_response_time_ms: float | None = None  # Rolling average response time
 
 
 # === Gateway Tool Input/Output Types ===
@@ -218,6 +233,52 @@ class HealthOutput(BaseModel):
     revision_id: str
     servers: list[ServerHealthInfo]
     last_refresh_ts: float
+
+
+# === Pending Request Monitoring Types ===
+
+
+class ListPendingInput(BaseModel):
+    """Input for gateway.list_pending."""
+
+    server: str | None = None  # Filter by server (optional)
+
+
+class PendingRequestInfo(BaseModel):
+    """Public view of a pending request."""
+
+    request_id: str  # Global unique ID (server::local_id)
+    server_name: str
+    tool_id: str
+    started_at_iso: str  # ISO timestamp
+    elapsed_seconds: float
+    timeout_ms: int
+    state: str  # RequestState value
+    last_heartbeat_seconds_ago: float
+
+
+class ListPendingOutput(BaseModel):
+    """Output for gateway.list_pending."""
+
+    requests: list[PendingRequestInfo]
+    total_pending: int
+
+
+class CancelInput(BaseModel):
+    """Input for gateway.cancel."""
+
+    request_id: str = Field(min_length=1)  # Format: "server_name::local_id"
+    force: bool = False  # Force cancel even if heartbeat is recent
+
+
+class CancelOutput(BaseModel):
+    """Output for gateway.cancel."""
+
+    request_id: str
+    status: str  # "cancelled", "not_found", "already_complete", "refused"
+    message: str
+    was_stalled: bool  # True if request had no recent heartbeat
+    elapsed_seconds: float | None = None
 
 
 # === Policy Types ===

@@ -102,6 +102,10 @@ class GatewayServer:
                     result = await self._gateway_tools.provision(arguments)
                 elif name == "gateway.provision_status":
                     result = await self._gateway_tools.provision_status(arguments)
+                elif name == "gateway.list_pending":
+                    result = await self._gateway_tools.list_pending(arguments)
+                elif name == "gateway.cancel":
+                    result = await self._gateway_tools.cancel(arguments)
                 else:
                     raise ValueError(f"Unknown tool: {name}")
 
@@ -190,6 +194,9 @@ class GatewayServer:
 
         if errors:
             logger.warning(f"Some servers failed to connect: {len(errors)} errors")
+
+        # Start health monitor for heartbeat tracking
+        self._client_manager.start_health_monitor()
 
         statuses = self._client_manager.get_all_server_statuses()
         online = sum(1 for s in statuses if s.status.value == "online")

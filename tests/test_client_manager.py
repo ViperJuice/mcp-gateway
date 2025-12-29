@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -10,6 +11,7 @@ import pytest
 from mcp_gateway.client.manager import (
     ClientManager,
     ManagedClient,
+    PendingRequest,
     _extract_tags,
     _infer_risk_hint,
     _truncate_description,
@@ -155,9 +157,18 @@ class TestDisconnectAll:
         """Test that disconnect_all cancels pending requests."""
         manager, managed = manager_with_client
 
-        # Add pending request
+        # Add pending request using PendingRequest
         future: asyncio.Future[dict] = asyncio.get_event_loop().create_future()
-        managed.pending_requests[1] = future
+        pending = PendingRequest(
+            request_id=1,
+            server_name="test",
+            tool_id="test::tool",
+            started_at=time.time(),
+            last_heartbeat=time.time(),
+            timeout_ms=30000,
+            future=future,
+        )
+        managed.pending_requests[1] = pending
 
         await manager.disconnect_all()
 
@@ -280,9 +291,18 @@ class TestServerHealthTracking:
             status=status,
         )
 
-        # Add pending request
+        # Add pending request using PendingRequest
         future: asyncio.Future[dict] = asyncio.get_event_loop().create_future()
-        managed.pending_requests[1] = future
+        pending = PendingRequest(
+            request_id=1,
+            server_name="test",
+            tool_id="test::tool",
+            started_at=time.time(),
+            last_heartbeat=time.time(),
+            timeout_ms=30000,
+            future=future,
+        )
+        managed.pending_requests[1] = pending
 
         await manager._read_stdout("test", managed)
 

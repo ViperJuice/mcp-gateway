@@ -9,12 +9,14 @@ import os
 import random
 import string
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from typing import Any
 
 from mcp_gateway.config.loader import make_tool_id
 from mcp_gateway.types import (
     ResolvedServerConfig,
+    RequestState,
     RiskHint,
     ServerStatus,
     ServerStatusEnum,
@@ -22,6 +24,11 @@ from mcp_gateway.types import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Heartbeat thresholds for health monitoring
+HEARTBEAT_WARN_THRESHOLD = 60.0  # Warn if no activity for 60s
+HEARTBEAT_STALL_THRESHOLD = 120.0  # Mark as stalled after 120s
+HEALTH_CHECK_INTERVAL = 30.0  # Background health check every 30s
 
 
 def _generate_revision_id() -> str:
@@ -95,6 +102,19 @@ def _truncate_description(description: str, max_length: int = 100) -> str:
 
 
 @dataclass
+class PendingRequest:
+    """Metadata for tracking a pending tool invocation."""
+
+    request_id: int
+    server_name: str
+    tool_id: str  # Empty for non-tool requests (initialize, tools/list)
+    started_at: float  # time.time() when request started
+    last_heartbeat: float  # time.time() of last activity
+    timeout_ms: int  # Configured timeout
+    future: asyncio.Future[Any]
+
+
+@dataclass
 class ManagedClient:
     """A managed connection to a downstream MCP server."""
 
@@ -108,8 +128,10 @@ class ManagedClient:
         )
     )
     request_id: int = 0
-    pending_requests: dict[int, asyncio.Future[Any]] = field(default_factory=dict)
+    pending_requests: dict[int, PendingRequest] = field(default_factory=dict)
     read_task: asyncio.Task[None] | None = None
+    # Health monitoring: rolling window of response times for avg calculation
+    response_times: deque[float] = field(default_factory=lambda: deque(maxlen=100))
 
 
 class ClientManager:
@@ -260,20 +282,42 @@ class ClientManager:
                     # EOF - server process has exited
                     break
 
+                # UPDATE heartbeat on ANY output from server
+                now = time.time()
+                managed.status.last_activity_at = now
+
                 try:
                     message = json.loads(line.decode())
                     msg_id = message.get("id")
                     if msg_id is not None and msg_id in managed.pending_requests:
-                        future = managed.pending_requests.pop(msg_id)
+                        pending = managed.pending_requests.pop(msg_id)
+                        pending.last_heartbeat = now  # Update request heartbeat
+
+                        # Track response time
+                        elapsed_ms = (now - pending.started_at) * 1000
+                        managed.response_times.append(elapsed_ms)
+                        if managed.response_times:
+                            managed.status.avg_response_time_ms = sum(
+                                managed.response_times
+                            ) / len(managed.response_times)
+
+                        # Update pending count
+                        managed.status.pending_request_count = len(
+                            managed.pending_requests
+                        )
+
                         if "error" in message:
-                            future.set_exception(
+                            pending.future.set_exception(
                                 Exception(
                                     message["error"].get("message", "Unknown error")
                                 )
                             )
                         else:
-                            future.set_result(message.get("result", {}))
+                            pending.future.set_result(message.get("result", {}))
                 except json.JSONDecodeError:
+                    # Non-JSON output still counts as heartbeat for all pending
+                    for req in managed.pending_requests.values():
+                        req.last_heartbeat = now
                     logger.debug(f"[{name}] Non-JSON output: {line.decode().strip()}")
         except Exception as e:
             logger.debug(f"[{name}] Read error: {e}")
@@ -284,13 +328,21 @@ class ClientManager:
                 managed.status.status = ServerStatusEnum.ERROR
                 managed.status.last_error = "Server process exited"
             # Cancel any pending requests
-            for request_id, future in list(managed.pending_requests.items()):
-                if not future.done():
-                    future.set_exception(ConnectionError(f"Server {name} disconnected"))
+            for request_id, pending in list(managed.pending_requests.items()):
+                if not pending.future.done():
+                    pending.future.set_exception(
+                        ConnectionError(f"Server {name} disconnected")
+                    )
             managed.pending_requests.clear()
+            managed.status.pending_request_count = 0
 
     async def _send_request(
-        self, managed: ManagedClient, method: str, params: dict[str, Any]
+        self,
+        managed: ManagedClient,
+        method: str,
+        params: dict[str, Any],
+        tool_id: str = "",
+        timeout_ms: int = 30000,
     ) -> dict[str, Any]:
         """Send a JSON-RPC request and wait for response."""
         if not managed.process or not managed.process.stdin:
@@ -298,6 +350,7 @@ class ClientManager:
 
         managed.request_id += 1
         request_id = managed.request_id
+        now = time.time()
 
         request = {
             "jsonrpc": "2.0",
@@ -306,9 +359,19 @@ class ClientManager:
             "params": params,
         }
 
-        # Create future for response
+        # Create PendingRequest with metadata for health monitoring
         future: asyncio.Future[Any] = asyncio.get_event_loop().create_future()
-        managed.pending_requests[request_id] = future
+        pending = PendingRequest(
+            request_id=request_id,
+            server_name=managed.config.name,
+            tool_id=tool_id,
+            started_at=now,
+            last_heartbeat=now,
+            timeout_ms=timeout_ms,
+            future=future,
+        )
+        managed.pending_requests[request_id] = pending
+        managed.status.pending_request_count = len(managed.pending_requests)
 
         # Send request
         data = json.dumps(request) + "\n"
@@ -317,10 +380,11 @@ class ClientManager:
 
         # Wait for response with timeout
         try:
-            result = await asyncio.wait_for(future, timeout=30.0)
+            result = await asyncio.wait_for(future, timeout=timeout_ms / 1000.0)
             return result
         except asyncio.TimeoutError:
             managed.pending_requests.pop(request_id, None)
+            managed.status.pending_request_count = len(managed.pending_requests)
             raise TimeoutError(f"Request {method} timed out")
 
     async def _send_initialize(self, managed: ManagedClient) -> None:
@@ -347,15 +411,19 @@ class ClientManager:
 
     async def disconnect_all(self) -> None:
         """Disconnect from all servers."""
+        # Stop health monitor if running
+        self.stop_health_monitor()
+
         for name, managed in self._clients.items():
             try:
                 logger.info(f"Disconnecting from {name}")
 
                 # Cancel pending requests first
-                for request_id, future in list(managed.pending_requests.items()):
-                    if not future.done():
-                        future.cancel()
+                for request_id, pending in list(managed.pending_requests.items()):
+                    if not pending.future.done():
+                        pending.future.cancel()
                 managed.pending_requests.clear()
+                managed.status.pending_request_count = 0
 
                 # Cancel read task
                 if managed.read_task:
@@ -513,14 +581,13 @@ class ClientManager:
                 f"Server {tool_info.server_name} is {managed.status.status.value}"
             )
 
-        # Send tool call
-        result = await asyncio.wait_for(
-            self._send_request(
-                managed,
-                "tools/call",
-                {"name": tool_info.tool_name, "arguments": args},
-            ),
-            timeout=timeout_ms / 1000.0,
+        # Send tool call with metadata for health monitoring
+        result = await self._send_request(
+            managed,
+            "tools/call",
+            {"name": tool_info.tool_name, "arguments": args},
+            tool_id=tool_id,
+            timeout_ms=timeout_ms,
         )
 
         return result
@@ -549,3 +616,150 @@ class ClientManager:
         """Check if server is online."""
         status = self._servers.get(name)
         return status is not None and status.status == ServerStatusEnum.ONLINE
+
+    # === Health Monitoring Methods ===
+
+    def start_health_monitor(self) -> None:
+        """Start the background health monitoring task."""
+        if not hasattr(self, "_health_task") or self._health_task is None:
+            self._health_task: asyncio.Task[None] | None = asyncio.create_task(
+                self._health_monitor_loop()
+            )
+            logger.info("Started health monitor background task")
+
+    def stop_health_monitor(self) -> None:
+        """Stop the health monitoring task."""
+        if hasattr(self, "_health_task") and self._health_task:
+            self._health_task.cancel()
+            self._health_task = None
+            logger.debug("Stopped health monitor background task")
+
+    async def _health_monitor_loop(self) -> None:
+        """Background task to monitor server and request health."""
+        while True:
+            try:
+                await asyncio.sleep(HEALTH_CHECK_INTERVAL)
+                now = time.time()
+
+                for name, managed in self._clients.items():
+                    # Check process health
+                    if managed.process:
+                        returncode = managed.process.returncode
+                        if returncode is not None:
+                            logger.warning(
+                                f"Server {name} process exited with code {returncode}"
+                            )
+                            managed.status.status = ServerStatusEnum.ERROR
+                            managed.status.last_error = f"Process exited: {returncode}"
+                            continue
+
+                    # Check for stalled requests
+                    for req_id, pending in list(managed.pending_requests.items()):
+                        elapsed_since_heartbeat = now - pending.last_heartbeat
+
+                        if elapsed_since_heartbeat > HEARTBEAT_STALL_THRESHOLD:
+                            logger.warning(
+                                f"Request {name}::{req_id} stalled "
+                                f"(no heartbeat for {elapsed_since_heartbeat:.0f}s)"
+                            )
+                        elif elapsed_since_heartbeat > HEARTBEAT_WARN_THRESHOLD:
+                            logger.info(
+                                f"Request {name}::{req_id} slow "
+                                f"(no heartbeat for {elapsed_since_heartbeat:.0f}s)"
+                            )
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.debug(f"Health monitor error: {e}")
+
+    def get_pending_requests(self, server: str | None = None) -> list[PendingRequest]:
+        """Get all pending requests, optionally filtered by server."""
+        result: list[PendingRequest] = []
+        for name, managed in self._clients.items():
+            if server and name != server:
+                continue
+            result.extend(managed.pending_requests.values())
+        return result
+
+    def get_request_state(self, pending: PendingRequest) -> RequestState:
+        """Determine current state of a pending request."""
+        now = time.time()
+        elapsed = now - pending.started_at
+        heartbeat_age = now - pending.last_heartbeat
+
+        if pending.future.done():
+            if pending.future.cancelled():
+                return RequestState.CANCELLED
+            return RequestState.COMPLETED
+        if elapsed * 1000 > pending.timeout_ms:
+            return RequestState.TIMEOUT
+        if heartbeat_age > HEARTBEAT_STALL_THRESHOLD:
+            return RequestState.STALLED
+        if heartbeat_age > HEARTBEAT_WARN_THRESHOLD:
+            return RequestState.ACTIVE  # Still active but slow
+        return RequestState.PENDING
+
+    async def cancel_request(
+        self, request_id: str, force: bool = False
+    ) -> tuple[str, str, bool, float | None]:
+        """
+        Cancel a pending request.
+
+        Args:
+            request_id: Format "server_name::local_id"
+            force: Force cancel even if heartbeat is recent
+
+        Returns:
+            (status, message, was_stalled, elapsed_seconds)
+            - status: "cancelled", "not_found", "already_complete", "refused"
+        """
+        # Parse request_id format "server_name::local_id"
+        if "::" not in request_id:
+            return (
+                "not_found",
+                f"Invalid request_id format: {request_id}",
+                False,
+                None,
+            )
+
+        server_name, local_id_str = request_id.rsplit("::", 1)
+        try:
+            local_id = int(local_id_str)
+        except ValueError:
+            return ("not_found", f"Invalid local_id: {local_id_str}", False, None)
+
+        managed = self._clients.get(server_name)
+        if not managed:
+            return ("not_found", f"Server not found: {server_name}", False, None)
+
+        pending = managed.pending_requests.get(local_id)
+        if not pending:
+            return ("not_found", f"Request not found: {request_id}", False, None)
+
+        if pending.future.done():
+            return ("already_complete", "Request already completed", False, None)
+
+        now = time.time()
+        elapsed = now - pending.started_at
+        heartbeat_age = now - pending.last_heartbeat
+        was_stalled = heartbeat_age > HEARTBEAT_STALL_THRESHOLD
+
+        # Safety check: refuse to cancel healthy long-running requests unless forced
+        if not force and not was_stalled and elapsed < pending.timeout_ms / 1000:
+            return (
+                "refused",
+                f"Request is healthy (heartbeat {heartbeat_age:.0f}s ago). "
+                f"Use force=true to cancel anyway.",
+                False,
+                elapsed,
+            )
+
+        # Cancel the request
+        pending.future.cancel()
+        managed.pending_requests.pop(local_id, None)
+        managed.status.pending_request_count = len(managed.pending_requests)
+        logger.info(
+            f"Cancelled request {request_id} (stalled={was_stalled}, elapsed={elapsed:.1f}s)"
+        )
+
+        return ("cancelled", "Request cancelled successfully", was_stalled, elapsed)

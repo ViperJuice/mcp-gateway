@@ -23,6 +23,8 @@ from mcp_gateway.manifest.matcher import match_capability
 from mcp_gateway.policy.policy import PolicyManager
 from mcp_gateway.types import (
     ArgInfo,
+    CancelInput,
+    CancelOutput,
     CapabilityCandidate,
     CapabilityCard,
     CapabilityRequestInput,
@@ -34,6 +36,9 @@ from mcp_gateway.types import (
     InvokeInput,
     InvokeOutput,
     InvokeTemplate,
+    ListPendingInput,
+    ListPendingOutput,
+    PendingRequestInfo,
     ProvisionInput,
     ProvisionJobStatus,
     ProvisionOutput,
@@ -279,6 +284,47 @@ def get_gateway_tool_definitions() -> list[Tool]:
                     },
                 },
                 "required": ["job_id"],
+            },
+        ),
+        Tool(
+            name="gateway.list_pending",
+            description=(
+                "List all pending tool invocations with health status. "
+                "Shows elapsed time, heartbeat age, and current state for each request. "
+                "Use this to monitor long-running operations before deciding to cancel."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "server": {
+                        "type": "string",
+                        "description": "Filter to pending requests on a specific server (optional)",
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="gateway.cancel",
+            description=(
+                "Cancel a pending tool invocation. "
+                "By default, refuses to cancel healthy requests (recent heartbeat). "
+                "Use force=true to cancel anyway. "
+                "Use gateway.list_pending first to see request IDs and health status."
+            ),
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "request_id": {
+                        "type": "string",
+                        "description": 'Request ID in format "server_name::local_id" from gateway.list_pending',
+                    },
+                    "force": {
+                        "type": "boolean",
+                        "default": False,
+                        "description": "Force cancel even if request is healthy (has recent heartbeat)",
+                    },
+                },
+                "required": ["request_id"],
             },
         ),
     ]
@@ -1150,4 +1196,56 @@ class GatewayTools:
             platform=platform,
             detected_clis=list(detected_clis),
             message=f"Environment synced: {platform} with {len(detected_clis)} CLIs detected.",
+        )
+
+    async def list_pending(self, input_data: dict[str, Any]) -> ListPendingOutput:
+        """gateway.list_pending - List pending tool invocations with health status."""
+        import time
+        from datetime import datetime, timezone
+
+        parsed = ListPendingInput.model_validate(input_data)
+
+        pending_requests = self._client_manager.get_pending_requests(parsed.server)
+        now = time.time()
+
+        requests: list[PendingRequestInfo] = []
+        for req in pending_requests:
+            state = self._client_manager.get_request_state(req)
+            requests.append(
+                PendingRequestInfo(
+                    request_id=f"{req.server_name}::{req.request_id}",
+                    server_name=req.server_name,
+                    tool_id=req.tool_id,
+                    started_at_iso=datetime.fromtimestamp(
+                        req.started_at, tz=timezone.utc
+                    ).isoformat(),
+                    elapsed_seconds=now - req.started_at,
+                    timeout_ms=req.timeout_ms,
+                    state=state.value,
+                    last_heartbeat_seconds_ago=now - req.last_heartbeat,
+                )
+            )
+
+        return ListPendingOutput(
+            requests=requests,
+            total_pending=len(requests),
+        )
+
+    async def cancel(self, input_data: dict[str, Any]) -> CancelOutput:
+        """gateway.cancel - Cancel a pending tool invocation."""
+        parsed = CancelInput.model_validate(input_data)
+
+        (
+            status,
+            message,
+            was_stalled,
+            elapsed,
+        ) = await self._client_manager.cancel_request(parsed.request_id, parsed.force)
+
+        return CancelOutput(
+            request_id=parsed.request_id,
+            status=status,
+            message=message,
+            was_stalled=was_stalled,
+            elapsed_seconds=elapsed,
         )
