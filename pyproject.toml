@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gateway-mcp"
-version = "1.0.0"
+version = "1.0.1"
 description = "MCP Gateway - A meta-server for minimal Claude Code tool bloat with progressive disclosure"
 readme = "README.md"
 license = "MIT"

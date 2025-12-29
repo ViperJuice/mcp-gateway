@@ -380,15 +380,18 @@ class GatewayTools:
                 t for t in tools if RISK_ORDER.get(t.risk_hint.value, 4) <= max_risk
             ]
 
-        # Text search (if query provided)
+        # Text search (if query provided) - word-based matching
         if parsed.query:
-            query_lower = parsed.query.lower()
+            query_words = parsed.query.lower().split()
             tools = [
                 t
                 for t in tools
-                if query_lower in t.tool_name.lower()
-                or query_lower in t.short_description.lower()
-                or any(query_lower in tag for tag in t.tags)
+                if any(
+                    word in t.tool_name.lower()
+                    or word in t.short_description.lower()
+                    or any(word in tag for tag in t.tags)
+                    for word in query_words
+                )
             ]
 
         # Sort by relevance (if query) or alphabetically
