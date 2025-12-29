@@ -38,8 +38,7 @@ async def summarize_capabilities(tools: list[ToolInfo]) -> str:
         from mcp_gateway.baml_client.types import ToolDescription
     except ImportError as e:
         raise ImportError(
-            "baml-py not installed. "
-            "Install with: pip install baml-py"
+            "baml-py not installed. Install with: pip install baml-py"
         ) from e
 
     if not tools:

@@ -42,7 +42,9 @@ class InstallJob:
 
     id: str
     server_name: str
-    status: Literal["pending", "installing", "server_ready", "complete", "failed", "timeout"] = "pending"
+    status: Literal[
+        "pending", "installing", "server_ready", "complete", "failed", "timeout"
+    ] = "pending"
     progress: int = 0  # 0-100
     output_lines: list[str] = field(default_factory=list)
     last_heartbeat: float = field(default_factory=time.time)
@@ -110,7 +112,9 @@ class JobManager:
         )
         self._jobs[job_id] = job
 
-        logger.info(f"Starting install job {job_id} for {server_config.name}: {' '.join(install_cmd)}")
+        logger.info(
+            f"Starting install job {job_id} for {server_config.name}: {' '.join(install_cmd)}"
+        )
 
         try:
             # Start subprocess with stdin/stdout/stderr pipes
@@ -158,7 +162,11 @@ class JobManager:
                     job.status = "failed"
                     job.error = f"Monitor task crashed: {exc}"
                 # Kill subprocess if still running (but NOT if server_ready - it's being handed off)
-                if job.status != "server_ready" and job.process and job.process.returncode is None:
+                if (
+                    job.status != "server_ready"
+                    and job.process
+                    and job.process.returncode is None
+                ):
                     try:
                         job.process.kill()
                     except Exception:
@@ -186,7 +194,9 @@ class JobManager:
             return
 
         # Create tasks to read from both streams
-        async def read_line(stream: asyncio.StreamReader, name: str) -> tuple[str, bytes | None]:
+        async def read_line(
+            stream: asyncio.StreamReader, name: str
+        ) -> tuple[str, bytes | None]:
             """Read a line from a stream, return (stream_name, line)."""
             try:
                 line = await stream.readline()
@@ -206,9 +216,13 @@ class JobManager:
 
                 # Create read tasks if not already pending
                 if stdout_task is None and process.stdout:
-                    stdout_task = asyncio.create_task(read_line(process.stdout, "stdout"))
+                    stdout_task = asyncio.create_task(
+                        read_line(process.stdout, "stdout")
+                    )
                 if stderr_task is None and process.stderr:
-                    stderr_task = asyncio.create_task(read_line(process.stderr, "stderr"))
+                    stderr_task = asyncio.create_task(
+                        read_line(process.stderr, "stderr")
+                    )
 
                 # Wait for either stream to have output (or timeout)
                 pending_tasks = [t for t in [stdout_task, stderr_task] if t is not None]
@@ -234,7 +248,9 @@ class JobManager:
                             task.cancel()
                         await self._safe_terminate_process(process, job.id, force=True)
                         job.status = "timeout"
-                        job.error = f"Installation stalled (no output for {HEARTBEAT_TIMEOUT}s)"
+                        job.error = (
+                            f"Installation stalled (no output for {HEARTBEAT_TIMEOUT}s)"
+                        )
                         return
 
                     # Process completed tasks
@@ -261,16 +277,22 @@ class JobManager:
                                 job.output_lines = job.output_lines[-20:]
                                 # Try to parse progress from npm output
                                 try:
-                                    job.progress = self._parse_progress(decoded, job.progress)
+                                    job.progress = self._parse_progress(
+                                        decoded, job.progress
+                                    )
                                 except Exception:
                                     pass
-                                logger.debug(f"Install {job.id} [{stream_name}]: {decoded}")
+                                logger.debug(
+                                    f"Install {job.id} [{stream_name}]: {decoded}"
+                                )
 
                                 # Check both stdout AND stderr for server started
                                 # (some servers like memory-mcp write startup to stderr)
                                 try:
                                     if self._is_server_started(decoded):
-                                        logger.info(f"Install {job.id}: Server started on {stream_name}, ready for handoff")
+                                        logger.info(
+                                            f"Install {job.id}: Server started on {stream_name}, ready for handoff"
+                                        )
                                         job.status = "server_ready"
                                         job.progress = 100
                                         # Cancel pending tasks
@@ -279,7 +301,9 @@ class JobManager:
                                         # DON'T terminate - process stays running for ClientManager
                                         return
                                 except Exception as e:
-                                    logger.warning(f"Install {job.id}: Error in server detection: {e}")
+                                    logger.warning(
+                                        f"Install {job.id}: Error in server detection: {e}"
+                                    )
 
                 except asyncio.CancelledError:
                     # Task was cancelled - clean up
@@ -327,10 +351,7 @@ class JobManager:
                 job.process = None  # Allow GC
 
     async def _safe_terminate_process(
-        self,
-        process: asyncio.subprocess.Process,
-        job_id: str,
-        force: bool = False
+        self, process: asyncio.subprocess.Process, job_id: str, force: bool = False
     ) -> None:
         """Safely terminate a subprocess with timeout and fallback to kill."""
         try:
@@ -346,7 +367,9 @@ class JobManager:
                 await asyncio.wait_for(process.wait(), timeout=5.0)
             except asyncio.TimeoutError:
                 if not force:
-                    logger.warning(f"Install {job_id}: Process didn't terminate, killing")
+                    logger.warning(
+                        f"Install {job_id}: Process didn't terminate, killing"
+                    )
                     process.kill()
                     try:
                         await asyncio.wait_for(process.wait(), timeout=2.0)
@@ -429,7 +452,8 @@ class JobManager:
         old_jobs = [
             job_id
             for job_id, job in self._jobs.items()
-            if now - job.started_at > max_age and job.status in ("complete", "failed", "timeout")
+            if now - job.started_at > max_age
+            and job.status in ("complete", "failed", "timeout")
         ]
         for job_id in old_jobs:
             del self._jobs[job_id]
@@ -494,9 +518,7 @@ async def install_server(
             install_cmd = server_config.install.get("linux")
 
     if not install_cmd:
-        raise InstallError(
-            f"No install command for {server_config.name} on {platform}"
-        )
+        raise InstallError(f"No install command for {server_config.name} on {platform}")
 
     logger.info(f"Installing {server_config.name}: {' '.join(install_cmd)}")
 
@@ -530,9 +552,7 @@ async def install_server(
             f"Installation of {server_config.name} timed out after {timeout}s"
         )
     except FileNotFoundError as e:
-        raise InstallError(
-            f"Command not found for {server_config.name}: {e}"
-        )
+        raise InstallError(f"Command not found for {server_config.name}: {e}")
 
 
 async def verify_installation(server_config: ServerConfig) -> bool:

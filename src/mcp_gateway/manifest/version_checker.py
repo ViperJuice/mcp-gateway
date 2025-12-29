@@ -38,9 +38,13 @@ async def get_npm_version(package_name: str, timeout: float = 10.0) -> str | Non
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
+            async with session.get(
+                url, timeout=aiohttp.ClientTimeout(total=timeout)
+            ) as resp:
                 if resp.status != 200:
-                    logger.debug(f"npm lookup failed for {package_name}: HTTP {resp.status}")
+                    logger.debug(
+                        f"npm lookup failed for {package_name}: HTTP {resp.status}"
+                    )
                     return None
 
                 data = await resp.json()
@@ -76,9 +80,13 @@ async def get_pypi_version(package_name: str, timeout: float = 10.0) -> str | No
 
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, timeout=aiohttp.ClientTimeout(total=timeout)) as resp:
+            async with session.get(
+                url, timeout=aiohttp.ClientTimeout(total=timeout)
+            ) as resp:
                 if resp.status != 200:
-                    logger.debug(f"PyPI lookup failed for {package_name}: HTTP {resp.status}")
+                    logger.debug(
+                        f"PyPI lookup failed for {package_name}: HTTP {resp.status}"
+                    )
                     return None
 
                 data = await resp.json()
@@ -95,7 +103,9 @@ async def get_pypi_version(package_name: str, timeout: float = 10.0) -> str | No
         return None
 
 
-def detect_package_type(command: str, args: list[str]) -> tuple[Literal["npm", "pypi", "unknown"], str | None]:
+def detect_package_type(
+    command: str, args: list[str]
+) -> tuple[Literal["npm", "pypi", "unknown"], str | None]:
     """
     Detect package type and name from server command/args.
 

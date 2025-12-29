@@ -11,9 +11,13 @@ from dotenv import load_dotenv
 from mcp.types import Tool
 
 from mcp_gateway.client.manager import ClientManager
-from mcp_gateway.config.loader import load_configs, manifest_server_to_config, parse_tool_id
-from mcp_gateway.manifest.environment import detect_platform, get_cli_help, probe_clis
-from mcp_gateway.manifest.installer import MissingApiKeyError, get_job_manager, InstallError
+from mcp_gateway.config.loader import load_configs, manifest_server_to_config
+from mcp_gateway.manifest.environment import detect_platform, probe_clis
+from mcp_gateway.manifest.installer import (
+    MissingApiKeyError,
+    get_job_manager,
+    InstallError,
+)
 from mcp_gateway.manifest.loader import load_manifest
 from mcp_gateway.manifest.matcher import match_capability
 from mcp_gateway.policy.policy import PolicyManager
@@ -25,7 +29,6 @@ from mcp_gateway.types import (
     CapabilityResolution,
     CatalogSearchInput,
     CatalogSearchOutput,
-    CLIResolution,
     DescribeInput,
     HealthOutput,
     InvokeInput,
@@ -308,7 +311,9 @@ class GatewayTools:
 
         # Filter by server online status
         if not parsed.include_offline:
-            tools = [t for t in tools if self._client_manager.is_server_online(t.server_name)]
+            tools = [
+                t for t in tools if self._client_manager.is_server_online(t.server_name)
+            ]
 
         # Filter by server name
         if parsed.filters and parsed.filters.server:
@@ -322,7 +327,9 @@ class GatewayTools:
         # Filter by max risk level
         if parsed.filters and parsed.filters.risk_max:
             max_risk = RISK_ORDER.get(parsed.filters.risk_max, 4)
-            tools = [t for t in tools if RISK_ORDER.get(t.risk_hint.value, 4) <= max_risk]
+            tools = [
+                t for t in tools if RISK_ORDER.get(t.risk_hint.value, 4) <= max_risk
+            ]
 
         # Text search (if query provided)
         if parsed.query:
@@ -360,7 +367,9 @@ class GatewayTools:
                 tool_name=t.tool_name,
                 short_description=t.short_description,
                 tags=t.tags,
-                availability="online" if self._client_manager.is_server_online(t.server_name) else "offline",
+                availability="online"
+                if self._client_manager.is_server_online(t.server_name)
+                else "offline",
                 risk_hint=t.risk_hint.value,
             )
             for t in tools
@@ -513,7 +522,9 @@ class GatewayTools:
 
                 for server in auto_start_servers:
                     if server.name in seen_servers:
-                        logger.debug(f"Skipping manifest server '{server.name}' - already in .mcp.json")
+                        logger.debug(
+                            f"Skipping manifest server '{server.name}' - already in .mcp.json"
+                        )
                         continue
 
                     # Skip servers that require API keys if not set
@@ -633,14 +644,19 @@ class GatewayTools:
 
         # Get running servers
         running_servers = [
-            s.name for s in self._client_manager.get_all_server_statuses()
+            s.name
+            for s in self._client_manager.get_all_server_statuses()
             if s.status.value == "online"
         ]
 
         # Try BAML matching
         try:
             from mcp_gateway.baml_client import b
-            from mcp_gateway.baml_client.types import ManifestCLI, ManifestServer, ManifestSummary
+            from mcp_gateway.baml_client.types import (
+                ManifestCLI,
+                ManifestServer,
+                ManifestSummary,
+            )
 
             # Build manifest summary for BAML
             servers = [
@@ -665,6 +681,7 @@ class GatewayTools:
 
             # Call BAML
             import asyncio
+
             async with asyncio.timeout(15):
                 result = await b.MatchCapability(
                     query=parsed.query,
@@ -677,8 +694,12 @@ class GatewayTools:
             candidates: list[CapabilityCandidate] = []
             for c in result.candidates:
                 # Enrich with runtime info
-                is_installed = c.name in detected_clis if c.candidate_type == "cli" else False
-                is_running = c.name in running_servers if c.candidate_type == "server" else False
+                is_installed = (
+                    c.name in detected_clis if c.candidate_type == "cli" else False
+                )
+                is_running = (
+                    c.name in running_servers if c.candidate_type == "server" else False
+                )
 
                 # Get server info for API key details
                 env_var = None
@@ -693,18 +714,20 @@ class GatewayTools:
                         env_instructions = server_config.env_instructions
                         api_key_available = self._check_api_key_available(env_var)
 
-                candidates.append(CapabilityCandidate(
-                    name=c.name,
-                    candidate_type=c.candidate_type,
-                    relevance_score=c.relevance_score,
-                    reasoning=c.reasoning,
-                    requires_api_key=requires_api_key,
-                    api_key_available=api_key_available,
-                    env_var=env_var,
-                    env_instructions=env_instructions,
-                    is_installed=is_installed,
-                    is_running=is_running,
-                ))
+                candidates.append(
+                    CapabilityCandidate(
+                        name=c.name,
+                        candidate_type=c.candidate_type,
+                        relevance_score=c.relevance_score,
+                        reasoning=c.reasoning,
+                        requires_api_key=requires_api_key,
+                        api_key_available=api_key_available,
+                        env_var=env_var,
+                        env_instructions=env_instructions,
+                        is_installed=is_installed,
+                        is_running=is_running,
+                    )
+                )
 
             if not candidates:
                 logger.info(f"No matches for capability request: {parsed.query}")
@@ -725,7 +748,9 @@ class GatewayTools:
         except ImportError:
             logger.warning("BAML not available, falling back to keyword matching")
         except Exception as e:
-            logger.warning(f"BAML matching failed: {e}, falling back to keyword matching")
+            logger.warning(
+                f"BAML matching failed: {e}, falling back to keyword matching"
+            )
 
         # Fallback: use simple keyword matching
         match_result = await match_capability(
@@ -745,27 +770,35 @@ class GatewayTools:
 
         # Build single candidate from keyword match
         if match_result.entry_type == "cli":
-            candidates = [CapabilityCandidate(
-                name=match_result.entry_name,
-                candidate_type="cli",
-                relevance_score=match_result.confidence,
-                reasoning=match_result.reasoning,
-                is_installed=match_result.entry_name in detected_clis,
-            )]
+            candidates = [
+                CapabilityCandidate(
+                    name=match_result.entry_name,
+                    candidate_type="cli",
+                    relevance_score=match_result.confidence,
+                    reasoning=match_result.reasoning,
+                    is_installed=match_result.entry_name in detected_clis,
+                )
+            ]
         else:
             server_config = manifest.get_server(match_result.entry_name)
             env_var = server_config.env_var if server_config else None
-            candidates = [CapabilityCandidate(
-                name=match_result.entry_name,
-                candidate_type="server",
-                relevance_score=match_result.confidence,
-                reasoning=match_result.reasoning,
-                requires_api_key=server_config.requires_api_key if server_config else False,
-                api_key_available=self._check_api_key_available(env_var),
-                env_var=env_var,
-                env_instructions=server_config.env_instructions if server_config else None,
-                is_running=match_result.entry_name in running_servers,
-            )]
+            candidates = [
+                CapabilityCandidate(
+                    name=match_result.entry_name,
+                    candidate_type="server",
+                    relevance_score=match_result.confidence,
+                    reasoning=match_result.reasoning,
+                    requires_api_key=server_config.requires_api_key
+                    if server_config
+                    else False,
+                    api_key_available=self._check_api_key_available(env_var),
+                    env_var=env_var,
+                    env_instructions=server_config.env_instructions
+                    if server_config
+                    else None,
+                    is_running=match_result.entry_name in running_servers,
+                )
+            ]
 
         return CapabilityResolution(
             status="candidates",
@@ -794,7 +827,8 @@ class GatewayTools:
         # Check if already running
         if self._client_manager.is_server_online(server_name):
             tools = [
-                t for t in self._client_manager.get_all_tools()
+                t
+                for t in self._client_manager.get_all_tools()
                 if t.server_name == server_name
             ]
             return ProvisionOutput(
@@ -900,7 +934,9 @@ class GatewayTools:
             job_output_lines = list(job.output_lines)  # Copy the list
             elapsed = time.time() - job.started_at
 
-            logger.debug(f"provision_status: job={job_id} status={job_status} progress={job_progress}")
+            logger.debug(
+                f"provision_status: job={job_id} status={job_status} progress={job_progress}"
+            )
 
             # If server_ready, perform handoff to ClientManager
             if job_status == "server_ready":
@@ -925,7 +961,9 @@ class GatewayTools:
                     manifest = load_manifest()
                     server_config = manifest.get_server(job_server_name)
                     if not server_config:
-                        raise ValueError(f"Server '{job_server_name}' not found in manifest")
+                        raise ValueError(
+                            f"Server '{job_server_name}' not found in manifest"
+                        )
 
                     resolved_config = manifest_server_to_config(server_config)
 
@@ -940,7 +978,8 @@ class GatewayTools:
 
                     # Get the new tools
                     tools = [
-                        t for t in self._client_manager.get_all_tools()
+                        t
+                        for t in self._client_manager.get_all_tools()
                         if t.server_name == job_server_name
                     ]
 
@@ -963,11 +1002,15 @@ class GatewayTools:
                                 risk_hint=t.risk_hint.value,
                             )
                             for t in tools[:10]
-                        ] if tools else None,
+                        ]
+                        if tools
+                        else None,
                     )
 
                 except Exception as e:
-                    logger.error(f"Handoff failed for {job_server_name}: {e}", exc_info=True)
+                    logger.error(
+                        f"Handoff failed for {job_server_name}: {e}", exc_info=True
+                    )
                     job.status = "failed"
                     job.error = f"Handoff failed: {e}"
                     # Kill the orphaned process
@@ -998,7 +1041,8 @@ class GatewayTools:
                     await self.refresh({"reason": f"Provisioned {job_server_name}"})
                     # Get the new tools
                     tools = [
-                        t for t in self._client_manager.get_all_tools()
+                        t
+                        for t in self._client_manager.get_all_tools()
                         if t.server_name == job_server_name
                     ]
                 except Exception as e:
@@ -1032,7 +1076,9 @@ class GatewayTools:
                             risk_hint=t.risk_hint.value,
                         )
                         for t in tools[:10]
-                    ] if tools else None,
+                    ]
+                    if tools
+                    else None,
                     error=refresh_error,
                 )
 

@@ -153,7 +153,9 @@ class GatewayServer:
 
             for server in auto_start_servers:
                 if server.name in seen_servers:
-                    logger.debug(f"Skipping manifest server '{server.name}' - already in .mcp.json")
+                    logger.debug(
+                        f"Skipping manifest server '{server.name}' - already in .mcp.json"
+                    )
                     continue
 
                 # Skip servers that require API keys if not set
@@ -209,13 +211,17 @@ class GatewayServer:
             logger.info("Auto-generating descriptions cache for future startups...")
             try:
                 # Only cache for connected servers (auto_start ones)
-                connected_names = [s.name for s in statuses if s.status.value == "online"]
+                connected_names = [
+                    s.name for s in statuses if s.status.value == "online"
+                ]
                 self._descriptions_cache = await refresh_all(
                     manifest=manifest,
                     cache_path=cache_path,
                     servers=connected_names,
                 )
-                logger.info(f"Cached descriptions for {len(self._descriptions_cache.servers)} servers")
+                logger.info(
+                    f"Cached descriptions for {len(self._descriptions_cache.servers)} servers"
+                )
             except Exception as e:
                 logger.warning(f"Failed to auto-generate cache: {e}")
 
@@ -248,10 +254,7 @@ class GatewayServer:
         """Shutdown the server."""
         logger.info("Shutting down MCP Gateway...")
         try:
-            await asyncio.wait_for(
-                self._client_manager.disconnect_all(),
-                timeout=10.0
-            )
+            await asyncio.wait_for(self._client_manager.disconnect_all(), timeout=10.0)
         except asyncio.TimeoutError:
             logger.warning("Shutdown timed out, forcing disconnect")
         except Exception as e:

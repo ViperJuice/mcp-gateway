@@ -6,7 +6,6 @@ Tries pre-built cache first, then LLM summarization, finally templates.
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from mcp_gateway.summary.template_fallback import template_summary

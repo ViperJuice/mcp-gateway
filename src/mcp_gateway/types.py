@@ -343,7 +343,9 @@ class CapabilityResolution(BaseModel):
 class ProvisionInput(BaseModel):
     """Input for gateway.provision - install and start a specific server."""
 
-    server_name: str = Field(min_length=1, description="Name of the server to provision from manifest")
+    server_name: str = Field(
+        min_length=1, description="Name of the server to provision from manifest"
+    )
 
 
 class ProvisionOutput(BaseModel):
@@ -374,10 +376,20 @@ class ProvisionJobStatus(BaseModel):
 
     job_id: str
     server: str
-    status: Literal["pending", "installing", "server_ready", "complete", "failed", "timeout", "not_found"]
+    status: Literal[
+        "pending",
+        "installing",
+        "server_ready",
+        "complete",
+        "failed",
+        "timeout",
+        "not_found",
+    ]
     progress: int = Field(ge=0, le=100, description="Progress percentage 0-100")
     message: str
-    output_tail: list[str] = Field(default_factory=list, description="Last 5 lines of output")
+    output_tail: list[str] = Field(
+        default_factory=list, description="Last 5 lines of output"
+    )
     elapsed_seconds: float = 0.0
     # Only populated when status is complete
     new_tools: list[CapabilityCard] | None = None

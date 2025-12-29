@@ -63,17 +63,21 @@ class Manifest:
         """Get CLI alternative by name."""
         return self.cli_alternatives.get(name)
 
-    def search_by_keyword(self, keyword: str) -> tuple[list[CLIAlternative], list[ServerConfig]]:
+    def search_by_keyword(
+        self, keyword: str
+    ) -> tuple[list[CLIAlternative], list[ServerConfig]]:
         """Search CLIs and servers by keyword."""
         keyword_lower = keyword.lower()
 
         matching_clis = [
-            cli for cli in self.cli_alternatives.values()
+            cli
+            for cli in self.cli_alternatives.values()
             if any(keyword_lower in kw.lower() for kw in cli.keywords)
         ]
 
         matching_servers = [
-            server for server in self.servers.values()
+            server
+            for server in self.servers.values()
             if any(keyword_lower in kw.lower() for kw in server.keywords)
         ]
 
@@ -140,7 +144,9 @@ def load_manifest(manifest_path: Path | None = None) -> Manifest:
         version=data.get("version", "1.0"),
         cli_alternatives=cli_alternatives,
         servers=servers,
-        discovery_queue_path=data.get("discovery_queue_path", ".mcp-gateway/discovery_queue.json"),
+        discovery_queue_path=data.get(
+            "discovery_queue_path", ".mcp-gateway/discovery_queue.json"
+        ),
     )
 
     logger.info(

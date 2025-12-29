@@ -79,7 +79,7 @@ def parse_args() -> argparse.Namespace:
         "refresh",
         help="Refresh capability descriptions for MCP servers",
         description="Pre-generate L1/L2 descriptions for MCP servers. "
-                    "This avoids LLM calls on every startup.",
+        "This avoids LLM calls on every startup.",
     )
     refresh_parser.add_argument(
         "--server",
@@ -120,7 +120,6 @@ async def run_refresh(args: argparse.Namespace) -> None:
     from mcp_gateway.manifest.refresher import (
         check_staleness,
         get_cache_path,
-        load_descriptions_cache,
         refresh_all,
     )
 

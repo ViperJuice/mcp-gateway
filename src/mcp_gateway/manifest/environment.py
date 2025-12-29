@@ -91,7 +91,9 @@ async def check_cli(name: str, check_command: list[str]) -> CLIInfo | None:
         return None
 
 
-async def get_cli_help(name: str, help_command: list[str], max_lines: int = 50) -> str | None:
+async def get_cli_help(
+    name: str, help_command: list[str], max_lines: int = 50
+) -> str | None:
     """Get help output for a CLI."""
     try:
         process = await asyncio.create_subprocess_exec(
@@ -135,7 +137,9 @@ async def probe_clis(cli_configs: dict[str, dict]) -> dict[str, CLIInfo]:
     return detected
 
 
-def get_environment_info(detected_clis: dict[str, CLIInfo] | None = None) -> EnvironmentInfo:
+def get_environment_info(
+    detected_clis: dict[str, CLIInfo] | None = None,
+) -> EnvironmentInfo:
     """Get current environment information."""
     return EnvironmentInfo(
         platform=detect_platform(),

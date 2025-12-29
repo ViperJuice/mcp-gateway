@@ -100,11 +100,13 @@ class ManagedClient:
 
     config: ResolvedServerConfig
     process: asyncio.subprocess.Process | None = None
-    status: ServerStatus = field(default_factory=lambda: ServerStatus(
-        name="",
-        status=ServerStatusEnum.OFFLINE,
-        tool_count=0,
-    ))
+    status: ServerStatus = field(
+        default_factory=lambda: ServerStatus(
+            name="",
+            status=ServerStatusEnum.OFFLINE,
+            tool_count=0,
+        )
+    )
     request_id: int = 0
     pending_requests: dict[int, asyncio.Future[Any]] = field(default_factory=dict)
     read_task: asyncio.Task[None] | None = None
@@ -151,7 +153,9 @@ class ClientManager:
         self._servers[name] = status
 
         if not config.config.command:
-            raise ValueError(f"Server {name} missing command - only stdio transport supported")
+            raise ValueError(
+                f"Server {name} missing command - only stdio transport supported"
+            )
 
         logger.info(f"Connecting to MCP server: {name}")
 
@@ -233,9 +237,7 @@ class ClientManager:
                 process.kill()
             raise
 
-    async def _read_stderr(
-        self, name: str, stderr: asyncio.StreamReader
-    ) -> None:
+    async def _read_stderr(self, name: str, stderr: asyncio.StreamReader) -> None:
         """Read stderr from a server process."""
         try:
             while True:
@@ -265,7 +267,9 @@ class ClientManager:
                         future = managed.pending_requests.pop(msg_id)
                         if "error" in message:
                             future.set_exception(
-                                Exception(message["error"].get("message", "Unknown error"))
+                                Exception(
+                                    message["error"].get("message", "Unknown error")
+                                )
                             )
                         else:
                             future.set_result(message.get("result", {}))
@@ -358,8 +362,7 @@ class ClientManager:
                     managed.read_task.cancel()
                     try:
                         await asyncio.wait_for(
-                            asyncio.shield(managed.read_task),
-                            timeout=1.0
+                            asyncio.shield(managed.read_task), timeout=1.0
                         )
                     except (asyncio.TimeoutError, asyncio.CancelledError):
                         pass
@@ -506,7 +509,9 @@ class ClientManager:
             raise RuntimeError(f"Server {tool_info.server_name} is not connected")
 
         if managed.status.status != ServerStatusEnum.ONLINE:
-            raise RuntimeError(f"Server {tool_info.server_name} is {managed.status.status.value}")
+            raise RuntimeError(
+                f"Server {tool_info.server_name} is {managed.status.status.value}"
+            )
 
         # Send tool call
         result = await asyncio.wait_for(

@@ -90,31 +90,37 @@ async def _llm_match(
     # Add detected CLIs first (preferred)
     for name, cli in manifest.cli_alternatives.items():
         if name in detected_clis:
-            entries.append(ManifestEntry(
-                name=name,
-                entry_type="cli",
-                keywords=cli.keywords,
-                description=cli.description,
-            ))
+            entries.append(
+                ManifestEntry(
+                    name=name,
+                    entry_type="cli",
+                    keywords=cli.keywords,
+                    description=cli.description,
+                )
+            )
 
     # Add servers
     for name, server in manifest.servers.items():
-        entries.append(ManifestEntry(
-            name=name,
-            entry_type="server",
-            keywords=server.keywords,
-            description=server.description,
-        ))
+        entries.append(
+            ManifestEntry(
+                name=name,
+                entry_type="server",
+                keywords=server.keywords,
+                description=server.description,
+            )
+        )
 
     # Add non-detected CLIs last (less preferred since not installed)
     for name, cli in manifest.cli_alternatives.items():
         if name not in detected_clis:
-            entries.append(ManifestEntry(
-                name=name,
-                entry_type="cli",
-                keywords=cli.keywords,
-                description=f"{cli.description} (not installed)",
-            ))
+            entries.append(
+                ManifestEntry(
+                    name=name,
+                    entry_type="cli",
+                    keywords=cli.keywords,
+                    description=f"{cli.description} (not installed)",
+                )
+            )
 
     # Call BAML function
     result = await b.MatchCapabilityRequest(query, entries)

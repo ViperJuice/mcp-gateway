@@ -55,7 +55,9 @@ def parse_json_file(file_path: Path) -> McpConfigFile | None:
         return None
 
 
-def normalize_server_config(config: McpServerConfig, base_path: Path) -> McpServerConfig:
+def normalize_server_config(
+    config: McpServerConfig, base_path: Path
+) -> McpServerConfig:
     """Normalize server config (resolve relative paths)."""
     normalized = config.model_copy()
 
@@ -112,13 +114,19 @@ def load_configs(
                         ResolvedServerConfig(
                             name=name,
                             source="project",
-                            config=normalize_server_config(config, resolved_project_root),
+                            config=normalize_server_config(
+                                config, resolved_project_root
+                            ),
                         )
                     )
                     seen_servers.add(name)
 
     # 2. Load user configs
-    user_paths = list(user_config_paths) if user_config_paths is not None else DEFAULT_USER_CONFIG_PATHS
+    user_paths = (
+        list(user_config_paths)
+        if user_config_paths is not None
+        else DEFAULT_USER_CONFIG_PATHS
+    )
     for user_path in user_paths:
         user_config = parse_json_file(user_path)
 
@@ -135,7 +143,9 @@ def load_configs(
                     )
                     seen_servers.add(name)
                 else:
-                    logger.debug(f"Skipping user server '{name}' - already defined in project config")
+                    logger.debug(
+                        f"Skipping user server '{name}' - already defined in project config"
+                    )
 
     # 3. Load custom config (if specified via env or option)
     resolved_custom_path = custom_config_path
@@ -155,12 +165,16 @@ def load_configs(
                         ResolvedServerConfig(
                             name=name,
                             source="custom",
-                            config=normalize_server_config(config, resolved_custom_path.parent),
+                            config=normalize_server_config(
+                                config, resolved_custom_path.parent
+                            ),
                         )
                     )
                     seen_servers.add(name)
 
-    logger.info(f"Loaded {len(configs)} server configs from {len(seen_servers)} unique servers")
+    logger.info(
+        f"Loaded {len(configs)} server configs from {len(seen_servers)} unique servers"
+    )
     return configs
 
 

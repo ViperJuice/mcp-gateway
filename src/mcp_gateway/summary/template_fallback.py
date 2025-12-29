@@ -15,8 +15,26 @@ if TYPE_CHECKING:
 
 # Common capability keywords to extract from tool names/descriptions
 CAPABILITY_KEYWORDS = {
-    "navigation": ["navigate", "goto", "visit", "url", "page", "back", "forward", "reload"],
-    "interaction": ["click", "type", "input", "fill", "select", "submit", "press", "scroll"],
+    "navigation": [
+        "navigate",
+        "goto",
+        "visit",
+        "url",
+        "page",
+        "back",
+        "forward",
+        "reload",
+    ],
+    "interaction": [
+        "click",
+        "type",
+        "input",
+        "fill",
+        "select",
+        "submit",
+        "press",
+        "scroll",
+    ],
     "screenshots": ["screenshot", "capture", "snapshot", "image", "visual"],
     "debugging": ["console", "network", "debug", "inspect", "devtools", "log"],
     "content": ["read", "get", "fetch", "extract", "text", "content", "html"],
@@ -28,9 +46,7 @@ CAPABILITY_KEYWORDS = {
 
 def extract_capabilities(tools: list[ToolInfo]) -> list[str]:
     """Extract capability keywords from tool names and descriptions."""
-    text = " ".join(
-        f"{t.tool_name} {t.short_description}".lower() for t in tools
-    )
+    text = " ".join(f"{t.tool_name} {t.short_description}".lower() for t in tools)
 
     found_capabilities = []
     for capability, keywords in CAPABILITY_KEYWORDS.items():

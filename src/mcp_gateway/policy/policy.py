@@ -11,7 +11,7 @@ from typing import Any
 
 import yaml
 
-from mcp_gateway.types import GatewayPolicy, LimitsPolicy, RedactionPolicy
+from mcp_gateway.types import GatewayPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +146,9 @@ class PolicyManager:
         truncated_str = truncated_bytes.decode("utf-8", errors="ignore")
 
         # Add truncation indicator
-        truncated_str += f"\n\n[... OUTPUT TRUNCATED: {original_size} bytes -> {max_size} bytes ...]"
+        truncated_str += (
+            f"\n\n[... OUTPUT TRUNCATED: {original_size} bytes -> {max_size} bytes ...]"
+        )
 
         return (truncated_str, True, original_size)
 
@@ -199,7 +201,7 @@ class PolicyManager:
         if truncated:
             lines = output_str.count("\n") + 1
             first_line = output_str.split("\n")[0][:100] if output_str else ""
-            summary = f"Output was {raw_size} bytes ({lines} lines). First line: \"{first_line}...\""
+            summary = f'Output was {raw_size} bytes ({lines} lines). First line: "{first_line}..."'
 
         # Try to parse back to object if original was not string
         result: Any = final_str
