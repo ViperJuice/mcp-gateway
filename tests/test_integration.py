@@ -1,6 +1,6 @@
 """Integration tests for MCP Gateway.
 
-These tests require real MCP servers configured in ~/.mcp.json.
+These tests require MCP servers available via config or manifest.
 Skip with: pytest tests/test_integration.py -v --skip-integration
 """
 
@@ -9,33 +9,55 @@ from __future__ import annotations
 import os
 import pytest
 
-from mcp_gateway.config.loader import load_configs
+from mcp_gateway.config.loader import load_configs, manifest_server_to_config
 from mcp_gateway.client.manager import ClientManager
+from mcp_gateway.manifest.loader import load_manifest
 from mcp_gateway.policy.policy import PolicyManager
 from mcp_gateway.summary import generate_capability_summary
 from mcp_gateway.summary.template_fallback import template_summary
 from mcp_gateway.server import GatewayServer
 
 
-# Skip integration tests if no MCP servers configured
-def has_mcp_servers() -> bool:
-    """Check if there are MCP servers configured."""
+def get_available_servers() -> list:
+    """Get all available servers from config and manifest auto-start."""
+    # Load user configs
     configs = load_configs()
-    return len(configs) > 0
+    # Filter out gateway itself
+    configs = [c for c in configs if c.name != "mcp-gateway"]
+    seen_servers = {c.name for c in configs}
+
+    # Add manifest auto-start servers
+    manifest = load_manifest()
+    if manifest:
+        for server in manifest.get_auto_start_servers():
+            if server.name in seen_servers:
+                continue
+            # Skip if requires API key that's not set
+            if server.requires_api_key and server.env_var:
+                if not os.environ.get(server.env_var):
+                    continue
+            configs.append(manifest_server_to_config(server))
+
+    return configs
+
+
+def has_mcp_servers() -> bool:
+    """Check if there are MCP servers available (config or manifest)."""
+    return len(get_available_servers()) > 0
 
 
 skip_no_servers = pytest.mark.skipif(
-    not has_mcp_servers(), reason="No MCP servers configured in ~/.mcp.json"
+    not has_mcp_servers(), reason="No MCP servers available (config or manifest)"
 )
 
 
 class TestConfigLoading:
-    """Test config loading from real files."""
+    """Test config loading from real files and manifest."""
 
-    def test_loads_user_config(self) -> None:
-        """Verify we can load configs from ~/.mcp.json."""
-        configs = load_configs()
-        # Should find at least user configs
+    def test_loads_available_servers(self) -> None:
+        """Verify we can discover servers from config and manifest."""
+        configs = get_available_servers()
+        # Should find servers (from config or manifest auto-start)
         assert isinstance(configs, list)
 
         # Print what was found for debugging
@@ -49,8 +71,8 @@ class TestServerConnection:
 
     @pytest.mark.asyncio
     async def test_connects_to_servers(self) -> None:
-        """Test connecting to configured MCP servers."""
-        configs = load_configs()
+        """Test connecting to available MCP servers."""
+        configs = get_available_servers()
         policy = PolicyManager()
 
         allowed = [c for c in configs if policy.is_server_allowed(c.name)]
@@ -77,7 +99,7 @@ class TestServerConnection:
     @pytest.mark.asyncio
     async def test_lists_tools_from_servers(self) -> None:
         """Test listing tools from connected servers."""
-        configs = load_configs()
+        configs = get_available_servers()
         policy = PolicyManager()
 
         allowed = [c for c in configs if policy.is_server_allowed(c.name)]
@@ -105,7 +127,7 @@ class TestSummaryGeneration:
     @pytest.mark.asyncio
     async def test_template_summary_with_real_tools(self) -> None:
         """Test template fallback generates summary for real tools."""
-        configs = load_configs()
+        configs = get_available_servers()
         policy = PolicyManager()
 
         allowed = [c for c in configs if policy.is_server_allowed(c.name)]
@@ -131,7 +153,7 @@ class TestSummaryGeneration:
     @pytest.mark.asyncio
     async def test_generate_capability_summary_fallback(self) -> None:
         """Test generate_capability_summary falls back to template."""
-        configs = load_configs()
+        configs = get_available_servers()
         policy = PolicyManager()
 
         allowed = [c for c in configs if policy.is_server_allowed(c.name)]
@@ -189,7 +211,7 @@ class TestBAMLSummarization:
         if not os.environ.get("GROQ_API_KEY"):
             pytest.skip("GROQ_API_KEY not set")
 
-        configs = load_configs()
+        configs = get_available_servers()
         policy = PolicyManager()
 
         allowed = [c for c in configs if policy.is_server_allowed(c.name)]

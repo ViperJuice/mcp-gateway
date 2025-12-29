@@ -21,6 +21,41 @@ When Claude Code connects directly to multiple MCP servers (GitHub, Jira, DB, et
 - Returns **compact capability cards** first, detailed schemas only on request
 - Enforces output size caps and optional secret redaction
 
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        Claude Code                          │
+│  Only connects to mcp-gateway (single server in config)     │
+└────────────────────────────┬────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│                       MCP Gateway                           │
+│  • 9 meta-tools (catalog, invoke, provision, etc.)          │
+│  • Progressive disclosure (compact cards → full schemas)    │
+│  • Policy enforcement (allow/deny lists)                    │
+└────────────────────────────┬────────────────────────────────┘
+                             │
+        ┌────────────────────┼────────────────────┐
+        ▼                    ▼                    ▼
+┌───────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│  Auto-Start   │  │    Manifest     │  │  Custom Servers │
+│  (Playwright, │  │   (25+ servers  │  │  (your own MCP  │
+│   Context7)   │  │   on-demand)    │  │  servers)       │
+└───────────────┘  └─────────────────┘  └─────────────────┘
+```
+
+**Key principle**: Users configure ONLY `mcp-gateway` in Claude Code.
+The gateway discovers and manages all other servers.
+
+### Why Single-Gateway?
+
+1. **No tool bloat** - Claude sees 9 tools, not 50+
+2. **No restarts** - Provision new servers without restarting Claude Code
+3. **Consistent interface** - All tools accessed via `gateway.invoke`
+4. **Policy control** - Centralized allow/deny rules
+
 ## Quick Start
 
 ### Installation
@@ -260,6 +295,30 @@ The gateway discovers MCP servers from:
 3. **Custom config**: Via `--config` flag or `MCP_GATEWAY_CONFIG` env var
 
 Project configs override user configs when server names collide.
+
+### Adding Custom Servers
+
+For MCP servers not in the manifest (your own or third-party), add them to `~/.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "my-custom-server": {
+      "command": "node",
+      "args": ["./my-server.js"],
+      "env": {
+        "API_KEY": "..."
+      }
+    }
+  }
+}
+```
+
+The gateway automatically discovers and connects to these on startup.
+Custom servers are accessed through the gateway—not directly by Claude Code.
+
+**Important**: Don't add `mcp-gateway` itself to this file. The gateway is configured
+in Claude Code's config (`~/.claude/mcp.json`), not in the downstream server list.
 
 ### Policy File
 
