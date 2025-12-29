@@ -291,10 +291,39 @@ redaction:
     - "(password|secret)[\\s]*[:=][\\s]*[\"']?([^\\s\"']+)"
 ```
 
+### CLI Commands
+
+```bash
+# Start the gateway server (default)
+mcp-gateway
+
+# Check server status
+mcp-gateway status
+mcp-gateway status --json              # JSON output
+mcp-gateway status --server playwright # Filter by server
+mcp-gateway status --pending           # Show pending requests
+
+# View logs
+mcp-gateway logs
+mcp-gateway logs --follow              # Live tail
+mcp-gateway logs --tail 100            # Last 100 lines
+mcp-gateway logs --level error         # Filter by level
+
+# Refresh server connections
+mcp-gateway refresh
+mcp-gateway refresh --server github    # Refresh specific server
+mcp-gateway refresh --force            # Force reconnect all
+
+# Initialize config (interactive)
+mcp-gateway init
+mcp-gateway init --project ./myapp     # Specify project directory
+mcp-gateway init --force               # Overwrite existing config
+```
+
 ### CLI Options
 
 ```
-mcp-gateway [OPTIONS]
+mcp-gateway [OPTIONS] [COMMAND]
 
 OPTIONS:
   -h, --help              Show help
@@ -305,10 +334,98 @@ OPTIONS:
   --debug                 Enable debug logging
   -q, --quiet             Only show errors
 
+COMMANDS:
+  status                  Show server and tool status
+  logs                    View gateway logs
+  refresh                 Reload configurations
+  init                    Initialize project config
+
 ENVIRONMENT:
   MCP_GATEWAY_CONFIG      Custom config file path
   MCP_GATEWAY_POLICY      Policy file path
   MCP_GATEWAY_LOG_LEVEL   Log level
+```
+
+## Docker
+
+Run the gateway in a container:
+
+```bash
+# Using Docker
+docker run -it --rm \
+  -v ~/.mcp.json:/home/appuser/.mcp.json:ro \
+  -v ~/.env:/app/.env:ro \
+  ghcr.io/viperjuice/mcp-gateway:latest
+
+# Using Docker Compose
+docker-compose up -d
+```
+
+Build locally:
+
+```bash
+docker build -t mcp-gateway .
+docker run -it --rm mcp-gateway --help
+```
+
+## Health Monitoring
+
+The gateway tracks health of all connections and pending requests.
+
+### Check Health
+
+```
+gateway.health()
+```
+
+Returns server status, tool counts, and last refresh timestamp.
+
+### Monitor Long-Running Requests
+
+```
+gateway.list_pending()
+gateway.list_pending({ server: "playwright" })
+```
+
+Returns pending requests with elapsed time and heartbeat status.
+
+### Cancel Stuck Requests
+
+```
+gateway.cancel({ request_id: "playwright::42" })
+gateway.cancel({ request_id: "playwright::42", force: true })
+```
+
+Cancels a pending request. Use `force: true` to cancel even if the request has a recent heartbeat.
+
+## MCP Resources & Prompts
+
+The gateway proxies MCP resources and prompts from downstream servers.
+
+### Resources
+
+Resources are discoverable via the standard MCP protocol:
+
+```
+# List all resources (via MCP)
+resources/list
+
+# Read a resource
+resources/read { uri: "file:///path/to/file" }
+```
+
+Resources are filtered by policy - see [Policy File](#policy-file).
+
+### Prompts
+
+Prompts are also proxied from downstream servers:
+
+```
+# List all prompts (via MCP)
+prompts/list
+
+# Get a prompt
+prompts/get { name: "server::prompt-name" }
 ```
 
 ## Development
@@ -351,15 +468,16 @@ mcp-gateway/
 ├── src/mcp_gateway/
 │   ├── __init__.py
 │   ├── __main__.py           # python -m mcp_gateway entry
-│   ├── cli.py                # CLI argument parsing
+│   ├── cli.py                # CLI commands (status, logs, init, refresh)
 │   ├── server.py             # MCP server implementation
 │   ├── types.py              # Pydantic models
+│   ├── errors.py             # Error codes and exceptions
 │   ├── config/
 │   │   └── loader.py         # Config discovery (.mcp.json)
 │   ├── client/
-│   │   └── manager.py        # Downstream server connections
+│   │   └── manager.py        # Downstream server connections (parallel, retry)
 │   ├── policy/
-│   │   └── policy.py         # Allow/deny lists, output processing
+│   │   └── policy.py         # Allow/deny lists for servers/tools/resources/prompts
 │   ├── tools/
 │   │   └── handlers.py       # Gateway tool implementations
 │   ├── manifest/
@@ -369,14 +487,97 @@ mcp-gateway/
 │   │   ├── installer.py      # Server provisioning
 │   │   └── environment.py    # Platform/CLI detection
 │   └── baml_client/          # BAML-generated LLM client (optional)
-├── examples/
-│   ├── gateway-only.mcp.json
-│   ├── sample-backends.mcp.json
-│   └── gateway-policy.yaml
-├── tests/
+├── .github/
+│   ├── dependabot.yml        # Dependency auto-updates
+│   └── workflows/
+│       ├── test.yml          # CI tests, lint, typecheck
+│       ├── release.yml       # PyPI publishing
+│       └── docker.yml        # Docker image builds
+├── config/
+│   └── .mcp.json.example     # Example config for Docker
+├── tests/                    # 290+ tests, 65%+ coverage
+├── Dockerfile                # Multi-stage build
+├── docker-compose.yml
 ├── .env.example              # API key configuration template
 ├── pyproject.toml
 └── README.md
+```
+
+## Troubleshooting
+
+### Server Won't Connect
+
+```bash
+# Check server status
+mcp-gateway status
+
+# View detailed logs
+mcp-gateway logs --level debug
+
+# Try refreshing connections
+mcp-gateway refresh --force
+```
+
+### Missing API Key
+
+If a server requires an API key, set it in your environment or `.env` file:
+
+```bash
+# Check which key is needed
+mcp-gateway status --server github
+
+# Set the key
+export GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...
+
+# Or add to .env
+echo "GITHUB_PERSONAL_ACCESS_TOKEN=ghp_..." >> .env
+```
+
+### Tool Invocation Fails
+
+```bash
+# Check if tool exists
+gateway.catalog_search({ query: "tool-name" })
+
+# Get detailed schema
+gateway.describe({ tool_id: "server::tool-name" })
+
+# Check pending requests
+gateway.list_pending()
+```
+
+### Connection Timeouts
+
+The gateway uses exponential backoff retry (1s, 2s, 4s) for transient failures. If connections still fail:
+
+```bash
+# Increase log verbosity
+mcp-gateway --debug
+
+# Check if server process is running
+mcp-gateway status --verbose
+```
+
+### Policy Blocking Access
+
+If tools/resources/prompts are blocked by policy:
+
+```yaml
+# Check your policy file (~/.claude/gateway-policy.yaml)
+# Remove items from denylist or add to allowlist
+
+servers:
+  allowlist: []    # Empty = allow all
+  denylist: []
+
+tools:
+  denylist: []     # Remove blocking patterns
+
+resources:
+  denylist: []
+
+prompts:
+  denylist: []
 ```
 
 ## Architecture

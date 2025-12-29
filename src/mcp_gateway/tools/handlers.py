@@ -5,13 +5,14 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, cast
 
 from dotenv import load_dotenv
 from mcp.types import Tool
 
 from mcp_gateway.client.manager import ClientManager
 from mcp_gateway.config.loader import load_configs, manifest_server_to_config
+from mcp_gateway.errors import ErrorCode, GatewayException, make_error
 from mcp_gateway.manifest.environment import detect_platform, probe_clis
 from mcp_gateway.manifest.installer import (
     MissingApiKeyError,
@@ -344,6 +345,8 @@ class GatewayTools:
         self._policy_manager = policy_manager
         self._project_root = project_root
         self._custom_config_path = custom_config_path
+        self._detected_clis: set[str] | None = None
+        self._platform: str | None = None
 
     async def catalog_search(self, input_data: dict[str, Any]) -> CatalogSearchOutput:
         """gateway.catalog_search - Search for available tools."""
@@ -433,10 +436,16 @@ class GatewayTools:
 
         tool_info = self._client_manager.get_tool(parsed.tool_id)
         if not tool_info:
-            raise ValueError(f"Tool not found: {parsed.tool_id}")
+            raise GatewayException(
+                ErrorCode.E301_TOOL_NOT_FOUND,
+                details={"tool_id": parsed.tool_id},
+            )
 
         if not self._policy_manager.is_tool_allowed(parsed.tool_id):
-            raise ValueError(f"Tool is not allowed by policy: {parsed.tool_id}")
+            raise GatewayException(
+                ErrorCode.E402_TOOL_DENIED,
+                details={"tool_id": parsed.tool_id},
+            )
 
         # Extract args from schema
         args: list[ArgInfo] = []
@@ -491,21 +500,29 @@ class GatewayTools:
 
         tool_info = self._client_manager.get_tool(parsed.tool_id)
         if not tool_info:
+            error = make_error(
+                ErrorCode.E301_TOOL_NOT_FOUND,
+                tool_id=parsed.tool_id,
+            )
             return InvokeOutput(
                 tool_id=parsed.tool_id,
                 ok=False,
                 truncated=False,
                 raw_size_estimate=0,
-                errors=[f"Tool not found: {parsed.tool_id}"],
+                errors=[error.model_dump_json()],
             )
 
         if not self._policy_manager.is_tool_allowed(parsed.tool_id):
+            error = make_error(
+                ErrorCode.E402_TOOL_DENIED,
+                tool_id=parsed.tool_id,
+            )
             return InvokeOutput(
                 tool_id=parsed.tool_id,
                 ok=False,
                 truncated=False,
                 raw_size_estimate=0,
-                errors=[f"Tool is not allowed by policy: {parsed.tool_id}"],
+                errors=[error.model_dump_json()],
             )
 
         # Call the tool
@@ -535,13 +552,46 @@ class GatewayTools:
                 raw_size_estimate=processed["raw_size"],
             )
 
-        except Exception as e:
+        except TimeoutError:
+            error = make_error(
+                ErrorCode.E303_TOOL_TIMEOUT,
+                tool_id=parsed.tool_id,
+                timeout_ms=timeout_ms,
+            )
             return InvokeOutput(
                 tool_id=parsed.tool_id,
                 ok=False,
                 truncated=False,
                 raw_size_estimate=0,
-                errors=[str(e)],
+                errors=[error.model_dump_json()],
+            )
+
+        except ConnectionError as e:
+            error = make_error(
+                ErrorCode.E201_SERVER_OFFLINE,
+                message=str(e),
+                tool_id=parsed.tool_id,
+            )
+            return InvokeOutput(
+                tool_id=parsed.tool_id,
+                ok=False,
+                truncated=False,
+                raw_size_estimate=0,
+                errors=[error.model_dump_json()],
+            )
+
+        except Exception as e:
+            error = make_error(
+                ErrorCode.E302_TOOL_EXECUTION_FAILED,
+                message=str(e),
+                tool_id=parsed.tool_id,
+            )
+            return InvokeOutput(
+                tool_id=parsed.tool_id,
+                ok=False,
+                truncated=False,
+                raw_size_estimate=0,
+                errors=[error.model_dump_json()],
             )
 
     async def refresh(self, input_data: dict[str, Any]) -> RefreshOutput:
@@ -671,7 +721,7 @@ class GatewayTools:
         # Get detected CLIs (from input or probe)
         if parsed.available_clis:
             detected_clis = list(parsed.available_clis)
-        elif hasattr(self, "_detected_clis"):
+        elif self._detected_clis is not None:
             detected_clis = list(self._detected_clis)
         else:
             # Probe environment if not yet done
@@ -763,7 +813,7 @@ class GatewayTools:
                 candidates.append(
                     CapabilityCandidate(
                         name=c.name,
-                        candidate_type=c.candidate_type,
+                        candidate_type=cast(Literal["cli", "server"], c.candidate_type),
                         relevance_score=c.relevance_score,
                         reasoning=c.reasoning,
                         requires_api_key=requires_api_key,

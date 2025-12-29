@@ -6,6 +6,7 @@ from typing import Any
 
 import pytest
 
+from mcp_gateway.errors import GatewayException
 from mcp_gateway.policy.policy import PolicyManager
 from mcp_gateway.tools.handlers import GatewayTools
 from mcp_gateway.types import (
@@ -188,8 +189,9 @@ class TestDescribe:
 
     @pytest.mark.asyncio
     async def test_raises_for_unknown_tool(self, gateway_tools: GatewayTools) -> None:
-        with pytest.raises(ValueError, match="Tool not found"):
+        with pytest.raises(GatewayException) as exc_info:
             await gateway_tools.describe({"tool_id": "unknown::tool"})
+        assert exc_info.value.code.value == "E301"  # TOOL_NOT_FOUND
 
 
 class TestInvoke:

@@ -10,7 +10,17 @@ from pathlib import Path
 from typing import Any
 
 from mcp.server import Server
-from mcp.types import TextContent, Tool
+from mcp.types import (
+    GetPromptResult,
+    Prompt,
+    PromptArgument,
+    PromptMessage,
+    Resource,
+    TextContent,
+    TextResourceContents,
+    Tool,
+)
+from pydantic import AnyUrl
 
 from mcp_gateway.client.manager import ClientManager
 from mcp_gateway.config.loader import load_configs, manifest_server_to_config
@@ -123,6 +133,102 @@ class GatewayServer:
                         text=json.dumps({"error": True, "message": str(e)}),
                     )
                 ]
+
+        # Resource handlers - proxy from downstream servers
+        @self._server.list_resources()
+        async def list_resources() -> list[Resource]:
+            resources = self._client_manager.get_all_resources()
+            # Filter by policy
+            allowed_resources = [
+                r for r in resources if self._policy_manager.is_resource_allowed(r.resource_id)
+            ]
+            return [
+                Resource(
+                    uri=AnyUrl(r.uri),
+                    name=r.name or r.uri,
+                    description=r.description,
+                    mimeType=r.mime_type,
+                )
+                for r in allowed_resources
+            ]
+
+        @self._server.read_resource()
+        async def read_resource(uri: AnyUrl) -> list[TextResourceContents]:
+            # Find resource by URI
+            uri_str = str(uri)
+            resources = self._client_manager.get_all_resources()
+            resource_info = next((r for r in resources if r.uri == uri_str), None)
+
+            if not resource_info:
+                raise ValueError(f"Unknown resource: {uri_str}")
+
+            # Check policy
+            if not self._policy_manager.is_resource_allowed(resource_info.resource_id):
+                raise ValueError(f"Resource blocked by policy: {uri_str}")
+
+            result = await self._client_manager.read_resource(resource_info.resource_id)
+            contents = result.get("contents", [])
+
+            # Convert to TextResourceContents
+            return [
+                TextResourceContents(
+                    uri=AnyUrl(c.get("uri", uri_str)),
+                    mimeType=c.get("mimeType"),
+                    text=c.get("text", ""),
+                )
+                for c in contents
+                if "text" in c  # Only text contents for now
+            ]
+
+        # Prompt handlers - proxy from downstream servers
+        @self._server.list_prompts()
+        async def list_prompts() -> list[Prompt]:
+            prompts = self._client_manager.get_all_prompts()
+            # Filter by policy
+            allowed_prompts = [
+                p for p in prompts if self._policy_manager.is_prompt_allowed(p.prompt_id)
+            ]
+            return [
+                Prompt(
+                    name=p.prompt_id,  # Use full ID for uniqueness
+                    description=p.description,
+                    arguments=[
+                        PromptArgument(
+                            name=arg.name,
+                            description=arg.description,
+                            required=arg.required,
+                        )
+                        for arg in (p.arguments or [])
+                    ]
+                    if p.arguments
+                    else None,
+                )
+                for p in allowed_prompts
+            ]
+
+        @self._server.get_prompt()
+        async def get_prompt(
+            name: str, arguments: dict[str, str] | None = None
+        ) -> GetPromptResult:
+            # name is the prompt_id (server::name format)
+            # Check policy
+            if not self._policy_manager.is_prompt_allowed(name):
+                raise ValueError(f"Prompt blocked by policy: {name}")
+
+            result = await self._client_manager.get_prompt(name, arguments)
+
+            # Convert result to GetPromptResult
+            messages = result.get("messages", [])
+            return GetPromptResult(
+                description=result.get("description"),
+                messages=[
+                    PromptMessage(
+                        role=m.get("role", "user"),
+                        content=TextContent(type="text", text=m.get("content", {}).get("text", "")),
+                    )
+                    for m in messages
+                ],
+            )
 
     async def initialize(self) -> None:
         """Initialize connections to downstream servers and generate capability summary."""

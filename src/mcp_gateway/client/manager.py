@@ -15,8 +15,11 @@ from typing import Any
 
 from mcp_gateway.config.loader import make_tool_id
 from mcp_gateway.types import (
+    PromptArgumentInfo,
+    PromptInfo,
     ResolvedServerConfig,
     RequestState,
+    ResourceInfo,
     RiskHint,
     ServerStatus,
     ServerStatusEnum,
@@ -29,6 +32,10 @@ logger = logging.getLogger(__name__)
 HEARTBEAT_WARN_THRESHOLD = 60.0  # Warn if no activity for 60s
 HEARTBEAT_STALL_THRESHOLD = 120.0  # Mark as stalled after 120s
 HEALTH_CHECK_INTERVAL = 30.0  # Background health check every 30s
+
+# Connection retry settings
+MAX_CONNECTION_RETRIES = 3
+RETRY_DELAYS = [1.0, 2.0, 4.0]  # Exponential backoff delays in seconds
 
 
 def _generate_revision_id() -> str:
@@ -140,20 +147,41 @@ class ClientManager:
     def __init__(self, max_tools_per_server: int = 100) -> None:
         self._clients: dict[str, ManagedClient] = {}
         self._tools: dict[str, ToolInfo] = {}
+        self._resources: dict[str, ResourceInfo] = {}
+        self._prompts: dict[str, PromptInfo] = {}
         self._servers: dict[str, ServerStatus] = {}
         self._revision_id: str = _generate_revision_id()
         self._last_refresh_ts: float = time.time()
         self._max_tools_per_server = max_tools_per_server
 
-    async def connect_all(self, configs: list[ResolvedServerConfig]) -> list[str]:
-        """Connect to all configured servers."""
-        errors: list[str] = []
+    async def connect_all(
+        self, configs: list[ResolvedServerConfig], retry: bool = True
+    ) -> list[str]:
+        """Connect to all configured servers in parallel.
 
-        for config in configs:
-            try:
-                await self._connect_server(config)
-            except Exception as e:
-                error_msg = f"Failed to connect to {config.name}: {e}"
+        Args:
+            configs: List of server configurations
+            retry: Whether to retry failed connections with exponential backoff
+
+        Returns:
+            List of error messages for failed connections
+        """
+        if not configs:
+            return []
+
+        # Connect to all servers concurrently (with optional retry)
+        if retry:
+            tasks = [self._connect_with_retry(config) for config in configs]
+        else:
+            tasks = [self._connect_server(config) for config in configs]
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Collect errors from failed connections
+        errors: list[str] = []
+        for config, result in zip(configs, results):
+            if isinstance(result, Exception):
+                error_msg = f"Failed to connect to {config.name}: {result}"
                 logger.error(error_msg)
                 errors.append(error_msg)
 
@@ -161,6 +189,28 @@ class ClientManager:
         self._last_refresh_ts = time.time()
 
         return errors
+
+    async def _connect_with_retry(self, config: ResolvedServerConfig) -> None:
+        """Connect to a server with exponential backoff retry."""
+        last_error: Exception | None = None
+
+        for attempt in range(MAX_CONNECTION_RETRIES):
+            try:
+                await self._connect_server(config)
+                return  # Success
+            except Exception as e:
+                last_error = e
+                if attempt < MAX_CONNECTION_RETRIES - 1:
+                    delay = RETRY_DELAYS[attempt]
+                    logger.warning(
+                        f"Connection to {config.name} failed (attempt {attempt + 1}/"
+                        f"{MAX_CONNECTION_RETRIES}), retrying in {delay}s: {e}"
+                    )
+                    await asyncio.sleep(delay)
+
+        # All retries exhausted
+        if last_error:
+            raise last_error
 
     async def _connect_server(self, config: ResolvedServerConfig) -> None:
         """Connect to a single MCP server."""
@@ -245,12 +295,76 @@ class ClientManager:
                 self._tools[tool_id] = tool_info
                 indexed += 1
 
+            # List resources and prompts in parallel (optional - server may not support)
+            resource_count = 0
+            prompt_count = 0
+
+            resources_task = self._send_request(managed, "resources/list", {})
+            prompts_task = self._send_request(managed, "prompts/list", {})
+            listing_results = await asyncio.gather(
+                resources_task, prompts_task, return_exceptions=True
+            )
+
+            # Process resources result
+            resources_result = listing_results[0]
+            if isinstance(resources_result, Exception):
+                logger.debug(f"Server {name} doesn't support resources: {resources_result}")
+            else:
+                resources = resources_result.get("resources", [])
+                for resource in resources:
+                    uri = resource.get("uri", "")
+                    resource_id = f"{name}::{uri}"
+                    resource_info = ResourceInfo(
+                        resource_id=resource_id,
+                        server_name=name,
+                        uri=uri,
+                        name=resource.get("name"),
+                        description=resource.get("description"),
+                        mime_type=resource.get("mimeType"),
+                    )
+                    self._resources[resource_id] = resource_info
+                    resource_count += 1
+
+            # Process prompts result
+            prompts_result = listing_results[1]
+            if isinstance(prompts_result, Exception):
+                logger.debug(f"Server {name} doesn't support prompts: {prompts_result}")
+            else:
+                prompts = prompts_result.get("prompts", [])
+                for prompt in prompts:
+                    prompt_name = prompt.get("name", "")
+                    prompt_id = f"{name}::{prompt_name}"
+                    arguments = None
+                    if prompt.get("arguments"):
+                        arguments = [
+                            PromptArgumentInfo(
+                                name=arg.get("name", ""),
+                                description=arg.get("description"),
+                                required=arg.get("required", False),
+                            )
+                            for arg in prompt["arguments"]
+                        ]
+                    prompt_info = PromptInfo(
+                        prompt_id=prompt_id,
+                        server_name=name,
+                        name=prompt_name,
+                        description=prompt.get("description"),
+                        arguments=arguments,
+                    )
+                    self._prompts[prompt_id] = prompt_info
+                    prompt_count += 1
+
             # Update status
             status.status = ServerStatusEnum.ONLINE
             status.tool_count = indexed
+            status.resource_count = resource_count
+            status.prompt_count = prompt_count
             status.last_connected_at = time.time()
 
-            logger.info(f"Connected to {name}: {indexed} tools indexed")
+            logger.info(
+                f"Connected to {name}: {indexed} tools, "
+                f"{resource_count} resources, {prompt_count} prompts indexed"
+            )
 
         except Exception as e:
             status.status = ServerStatusEnum.ERROR
@@ -592,6 +706,65 @@ class ClientManager:
 
         return result
 
+    async def read_resource(self, resource_id: str, timeout_ms: int = 30000) -> Any:
+        """Read a resource from a downstream server."""
+        resource_info = self._resources.get(resource_id)
+        if not resource_info:
+            raise ValueError(f"Unknown resource: {resource_id}")
+
+        managed = self._clients.get(resource_info.server_name)
+        if not managed or not managed.process:
+            raise RuntimeError(
+                f"Server {resource_info.server_name} is not connected"
+            )
+
+        if managed.status.status != ServerStatusEnum.ONLINE:
+            raise RuntimeError(
+                f"Server {resource_info.server_name} is {managed.status.status.value}"
+            )
+
+        result = await self._send_request(
+            managed,
+            "resources/read",
+            {"uri": resource_info.uri},
+            timeout_ms=timeout_ms,
+        )
+
+        return result
+
+    async def get_prompt(
+        self,
+        prompt_id: str,
+        arguments: dict[str, str] | None = None,
+        timeout_ms: int = 30000,
+    ) -> Any:
+        """Get a prompt from a downstream server."""
+        prompt_info = self._prompts.get(prompt_id)
+        if not prompt_info:
+            raise ValueError(f"Unknown prompt: {prompt_id}")
+
+        managed = self._clients.get(prompt_info.server_name)
+        if not managed or not managed.process:
+            raise RuntimeError(f"Server {prompt_info.server_name} is not connected")
+
+        if managed.status.status != ServerStatusEnum.ONLINE:
+            raise RuntimeError(
+                f"Server {prompt_info.server_name} is {managed.status.status.value}"
+            )
+
+        params: dict[str, Any] = {"name": prompt_info.name}
+        if arguments:
+            params["arguments"] = arguments
+
+        result = await self._send_request(
+            managed,
+            "prompts/get",
+            params,
+            timeout_ms=timeout_ms,
+        )
+
+        return result
+
     def get_tool(self, tool_id: str) -> ToolInfo | None:
         """Get tool info by ID."""
         return self._tools.get(tool_id)
@@ -599,6 +772,22 @@ class ClientManager:
     def get_all_tools(self) -> list[ToolInfo]:
         """Get all tools."""
         return list(self._tools.values())
+
+    def get_resource(self, resource_id: str) -> ResourceInfo | None:
+        """Get resource info by ID."""
+        return self._resources.get(resource_id)
+
+    def get_all_resources(self) -> list[ResourceInfo]:
+        """Get all resources."""
+        return list(self._resources.values())
+
+    def get_prompt_info(self, prompt_id: str) -> PromptInfo | None:
+        """Get prompt info by ID."""
+        return self._prompts.get(prompt_id)
+
+    def get_all_prompts(self) -> list[PromptInfo]:
+        """Get all prompts."""
+        return list(self._prompts.values())
 
     def get_server_status(self, name: str) -> ServerStatus | None:
         """Get server status."""

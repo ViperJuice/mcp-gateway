@@ -310,3 +310,256 @@ class TestServerHealthTracking:
         assert future.done()
         with pytest.raises(ConnectionError):
             future.result()
+
+
+class TestResourcesAndPrompts:
+    """Tests for resource and prompt support."""
+
+    @pytest.fixture
+    def manager(self) -> ClientManager:
+        """Create a ClientManager instance."""
+        return ClientManager()
+
+    def test_init_has_resources_and_prompts(self, manager: ClientManager) -> None:
+        """Test ClientManager initializes with empty resources and prompts."""
+        assert manager._resources == {}
+        assert manager._prompts == {}
+
+    def test_get_resource_not_found(self, manager: ClientManager) -> None:
+        """Test get_resource returns None for unknown resources."""
+        assert manager.get_resource("unknown::resource") is None
+
+    def test_get_all_resources_empty(self, manager: ClientManager) -> None:
+        """Test get_all_resources returns empty list initially."""
+        assert manager.get_all_resources() == []
+
+    def test_get_prompt_info_not_found(self, manager: ClientManager) -> None:
+        """Test get_prompt_info returns None for unknown prompts."""
+        assert manager.get_prompt_info("unknown::prompt") is None
+
+    def test_get_all_prompts_empty(self, manager: ClientManager) -> None:
+        """Test get_all_prompts returns empty list initially."""
+        assert manager.get_all_prompts() == []
+
+    @pytest.fixture
+    def manager_with_resources(self) -> ClientManager:
+        """Create a ClientManager with test resources."""
+        from mcp_gateway.types import ResourceInfo
+
+        manager = ClientManager()
+
+        resource = ResourceInfo(
+            resource_id="test::file:///test.txt",
+            server_name="test",
+            uri="file:///test.txt",
+            name="test.txt",
+            description="A test file",
+            mime_type="text/plain",
+        )
+        manager._resources["test::file:///test.txt"] = resource
+
+        return manager
+
+    @pytest.fixture
+    def manager_with_prompts(self) -> ClientManager:
+        """Create a ClientManager with test prompts."""
+        from mcp_gateway.types import PromptArgumentInfo, PromptInfo
+
+        manager = ClientManager()
+
+        prompt = PromptInfo(
+            prompt_id="test::greeting",
+            server_name="test",
+            name="greeting",
+            description="A greeting prompt",
+            arguments=[
+                PromptArgumentInfo(
+                    name="name",
+                    description="Name to greet",
+                    required=True,
+                )
+            ],
+        )
+        manager._prompts["test::greeting"] = prompt
+
+        return manager
+
+    def test_get_resource_found(self, manager_with_resources: ClientManager) -> None:
+        """Test get_resource returns resource info."""
+        resource = manager_with_resources.get_resource("test::file:///test.txt")
+        assert resource is not None
+        assert resource.name == "test.txt"
+        assert resource.mime_type == "text/plain"
+
+    def test_get_all_resources(self, manager_with_resources: ClientManager) -> None:
+        """Test get_all_resources returns all resources."""
+        resources = manager_with_resources.get_all_resources()
+        assert len(resources) == 1
+        assert resources[0].uri == "file:///test.txt"
+
+    def test_get_prompt_info_found(self, manager_with_prompts: ClientManager) -> None:
+        """Test get_prompt_info returns prompt info."""
+        prompt = manager_with_prompts.get_prompt_info("test::greeting")
+        assert prompt is not None
+        assert prompt.name == "greeting"
+        assert prompt.arguments is not None
+        assert len(prompt.arguments) == 1
+
+    def test_get_all_prompts(self, manager_with_prompts: ClientManager) -> None:
+        """Test get_all_prompts returns all prompts."""
+        prompts = manager_with_prompts.get_all_prompts()
+        assert len(prompts) == 1
+        assert prompts[0].name == "greeting"
+
+    @pytest.mark.asyncio
+    async def test_read_resource_unknown(
+        self, manager_with_resources: ClientManager
+    ) -> None:
+        """Test read_resource raises for unknown resources."""
+        with pytest.raises(ValueError, match="Unknown resource"):
+            await manager_with_resources.read_resource("unknown::resource")
+
+    @pytest.mark.asyncio
+    async def test_read_resource_server_not_connected(
+        self, manager_with_resources: ClientManager
+    ) -> None:
+        """Test read_resource raises when server not connected."""
+        with pytest.raises(RuntimeError, match="not connected"):
+            await manager_with_resources.read_resource("test::file:///test.txt")
+
+    @pytest.mark.asyncio
+    async def test_get_prompt_unknown(
+        self, manager_with_prompts: ClientManager
+    ) -> None:
+        """Test get_prompt raises for unknown prompts."""
+        with pytest.raises(ValueError, match="Unknown prompt"):
+            await manager_with_prompts.get_prompt("unknown::prompt")
+
+    @pytest.mark.asyncio
+    async def test_get_prompt_server_not_connected(
+        self, manager_with_prompts: ClientManager
+    ) -> None:
+        """Test get_prompt raises when server not connected."""
+        with pytest.raises(RuntimeError, match="not connected"):
+            await manager_with_prompts.get_prompt("test::greeting")
+
+
+class TestParallelConnections:
+    """Tests for parallel connection behavior."""
+
+    @pytest.mark.asyncio
+    async def test_connect_all_empty_list(self) -> None:
+        """Test connect_all with empty config list."""
+        manager = ClientManager()
+        errors = await manager.connect_all([])
+        assert errors == []
+
+    @pytest.mark.asyncio
+    async def test_connect_all_parallel_execution(self) -> None:
+        """Test that connect_all runs connections in parallel."""
+        manager = ClientManager()
+        call_times: list[float] = []
+
+        async def mock_connect(config: MagicMock) -> None:
+            call_times.append(time.time())
+            await asyncio.sleep(0.1)  # Simulate connection time
+
+        # Patch the connection method
+        manager._connect_server = mock_connect  # type: ignore[method-assign]
+
+        # Create mock configs
+        configs = [MagicMock(name=f"server{i}") for i in range(3)]
+
+        start = time.time()
+        await manager.connect_all(configs, retry=False)
+        elapsed = time.time() - start
+
+        # If parallel, should complete in ~0.1s, not ~0.3s
+        assert elapsed < 0.2, f"Expected parallel execution, took {elapsed}s"
+        assert len(call_times) == 3
+
+    @pytest.mark.asyncio
+    async def test_connect_all_collects_errors(self) -> None:
+        """Test that connect_all collects errors from failed connections."""
+        manager = ClientManager()
+
+        async def mock_connect(config: MagicMock) -> None:
+            if getattr(config, "_server_name", "") == "fail":
+                raise RuntimeError("Connection failed")
+
+        manager._connect_server = mock_connect  # type: ignore[method-assign]
+
+        # Create configs with server names
+        configs = []
+        for name in ["success", "fail", "success2"]:
+            config = MagicMock()
+            config._server_name = name
+            config.name = name
+            configs.append(config)
+
+        errors = await manager.connect_all(configs, retry=False)
+        assert len(errors) == 1
+        assert "fail" in errors[0]
+        assert "Connection failed" in errors[0]
+
+
+class TestConnectionRetry:
+    """Tests for connection retry behavior."""
+
+    @pytest.mark.asyncio
+    async def test_retry_succeeds_on_second_attempt(self) -> None:
+        """Test that retry succeeds after initial failure."""
+        manager = ClientManager()
+        attempts = 0
+
+        async def mock_connect(config: MagicMock) -> None:
+            nonlocal attempts
+            attempts += 1
+            if attempts < 2:
+                raise RuntimeError("Transient failure")
+
+        manager._connect_server = mock_connect  # type: ignore[method-assign]
+
+        config = MagicMock(name="retry-server")
+        await manager._connect_with_retry(config)
+
+        assert attempts == 2  # First failed, second succeeded
+
+    @pytest.mark.asyncio
+    async def test_retry_exhausts_all_attempts(self) -> None:
+        """Test that retry raises after all attempts fail."""
+        manager = ClientManager()
+        attempts = 0
+
+        async def mock_connect(config: MagicMock) -> None:
+            nonlocal attempts
+            attempts += 1
+            raise RuntimeError(f"Failure {attempts}")
+
+        manager._connect_server = mock_connect  # type: ignore[method-assign]
+
+        config = MagicMock(name="always-fail")
+
+        with pytest.raises(RuntimeError, match="Failure 3"):
+            await manager._connect_with_retry(config)
+
+        assert attempts == 3  # All retries exhausted
+
+    @pytest.mark.asyncio
+    async def test_retry_disabled(self) -> None:
+        """Test that retry can be disabled."""
+        manager = ClientManager()
+        attempts = 0
+
+        async def mock_connect(config: MagicMock) -> None:
+            nonlocal attempts
+            attempts += 1
+            raise RuntimeError("Failure")
+
+        manager._connect_server = mock_connect  # type: ignore[method-assign]
+
+        configs = [MagicMock(name="no-retry")]
+        errors = await manager.connect_all(configs, retry=False)
+
+        assert attempts == 1  # No retry
+        assert len(errors) == 1

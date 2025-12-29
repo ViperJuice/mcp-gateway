@@ -112,6 +112,44 @@ class PolicyManager:
 
         return True
 
+    def is_resource_allowed(self, resource_id: str) -> bool:
+        """Check if resource is allowed by policy.
+
+        Args:
+            resource_id: Resource ID in format "server_name::uri"
+        """
+        denylist = self._policy.resources.denylist
+        allowlist = self._policy.resources.allowlist
+
+        # Check denylist first
+        if denylist and self._matches_any(resource_id, denylist):
+            return False
+
+        # If allowlist is specified, resource must be in it
+        if allowlist:
+            return self._matches_any(resource_id, allowlist)
+
+        return True
+
+    def is_prompt_allowed(self, prompt_id: str) -> bool:
+        """Check if prompt is allowed by policy.
+
+        Args:
+            prompt_id: Prompt ID in format "server_name::name"
+        """
+        denylist = self._policy.prompts.denylist
+        allowlist = self._policy.prompts.allowlist
+
+        # Check denylist first
+        if denylist and self._matches_any(prompt_id, denylist):
+            return False
+
+        # If allowlist is specified, prompt must be in it
+        if allowlist:
+            return self._matches_any(prompt_id, allowlist)
+
+        return True
+
     def get_max_tools_per_server(self) -> int:
         """Get max tools per server limit."""
         return self._policy.limits.max_tools_per_server

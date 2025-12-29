@@ -82,12 +82,43 @@ class ToolInfo(BaseModel):
     risk_hint: RiskHint
 
 
+class ResourceInfo(BaseModel):
+    """Internal resource information."""
+
+    resource_id: str  # Normalized: server_name::uri
+    server_name: str
+    uri: str
+    name: str | None = None
+    description: str | None = None
+    mime_type: str | None = None
+
+
+class PromptArgumentInfo(BaseModel):
+    """Prompt argument information."""
+
+    name: str
+    description: str | None = None
+    required: bool = False
+
+
+class PromptInfo(BaseModel):
+    """Internal prompt information."""
+
+    prompt_id: str  # Normalized: server_name::name
+    server_name: str
+    name: str
+    description: str | None = None
+    arguments: list[PromptArgumentInfo] | None = None
+
+
 class ServerStatus(BaseModel):
     """Status of a connected server."""
 
     name: str
     status: ServerStatusEnum
     tool_count: int
+    resource_count: int = 0
+    prompt_count: int = 0
     last_error: str | None = None
     last_connected_at: float | None = None
     # Health monitoring fields
@@ -298,6 +329,20 @@ class ToolPolicy(BaseModel):
     denylist: list[str] = Field(default_factory=list)  # Glob patterns
 
 
+class ResourcePolicy(BaseModel):
+    """Resource allow/deny policy."""
+
+    allowlist: list[str] = Field(default_factory=list)  # Glob patterns (server::uri)
+    denylist: list[str] = Field(default_factory=list)  # Glob patterns
+
+
+class PromptPolicy(BaseModel):
+    """Prompt allow/deny policy."""
+
+    allowlist: list[str] = Field(default_factory=list)  # Glob patterns (server::name)
+    denylist: list[str] = Field(default_factory=list)  # Glob patterns
+
+
 class LimitsPolicy(BaseModel):
     """Resource limits policy."""
 
@@ -317,6 +362,8 @@ class GatewayPolicy(BaseModel):
 
     servers: ServerPolicy = Field(default_factory=ServerPolicy)
     tools: ToolPolicy = Field(default_factory=ToolPolicy)
+    resources: ResourcePolicy = Field(default_factory=ResourcePolicy)
+    prompts: PromptPolicy = Field(default_factory=PromptPolicy)
     limits: LimitsPolicy = Field(default_factory=LimitsPolicy)
     redaction: RedactionPolicy = Field(default_factory=RedactionPolicy)
 

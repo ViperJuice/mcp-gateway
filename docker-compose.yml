@@ -1,0 +1,24 @@
+services:
+  mcp-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+    # Mount configuration files
+    volumes:
+      # MCP server configuration (required)
+      - ./config/.mcp.json:/home/appuser/.mcp.json:ro
+      # Environment variables for API keys (optional)
+      - ./.env:/app/.env:ro
+      # Cache directory for capability summaries (optional, for persistence)
+      - mcp-gateway-cache:/app/.mcp-gateway
+
+    environment:
+      - MCP_GATEWAY_LOG_LEVEL=info
+
+    # MCP uses stdio, so we need interactive mode for testing
+    stdin_open: true
+    tty: true
+
+volumes:
+  mcp-gateway-cache:
