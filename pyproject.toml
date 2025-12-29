@@ -61,6 +61,9 @@ packages = ["src/mcp_gateway"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 
+[tool.ruff]
+exclude = ["src/mcp_gateway/baml_client"]
+
 [tool.coverage.run]
 source = ["src/mcp_gateway"]
 omit = ["src/mcp_gateway/baml_client/*"]
@@ -71,3 +74,6 @@ exclude_lines = [
     "if TYPE_CHECKING:",
     "raise NotImplementedError",
 ]
+fail_under = 60
+show_missing = true
+skip_covered = true
