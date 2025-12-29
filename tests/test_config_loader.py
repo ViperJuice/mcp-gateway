@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import json
-import tempfile
 from pathlib import Path
 
-import pytest
 
 from mcp_gateway.config.loader import (
     load_configs,

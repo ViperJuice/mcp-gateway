@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-import json
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -16,7 +15,6 @@ from mcp_gateway.client.manager import (
     _truncate_description,
 )
 from mcp_gateway.types import (
-    ResolvedServerConfig,
     RiskHint,
     ServerStatus,
     ServerStatusEnum,
@@ -208,7 +206,9 @@ class TestCallTool:
         return manager
 
     @pytest.mark.asyncio
-    async def test_call_tool_unknown_tool(self, manager_with_tool: ClientManager) -> None:
+    async def test_call_tool_unknown_tool(
+        self, manager_with_tool: ClientManager
+    ) -> None:
         """Test call_tool raises for unknown tools."""
         with pytest.raises(ValueError, match="Unknown tool"):
             await manager_with_tool.call_tool("unknown::tool", {})

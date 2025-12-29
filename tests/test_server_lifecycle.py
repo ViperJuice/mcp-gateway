@@ -122,8 +122,12 @@ class TestGatewayServerIntegration:
                     return_value=[]
                 )
 
-                with patch("mcp_gateway.server.load_descriptions_cache", return_value=None):
-                    with patch("mcp_gateway.server.generate_capability_summary") as mock_summary:
+                with patch(
+                    "mcp_gateway.server.load_descriptions_cache", return_value=None
+                ):
+                    with patch(
+                        "mcp_gateway.server.generate_capability_summary"
+                    ) as mock_summary:
                         mock_summary.return_value = "No tools available"
 
                         server = GatewayServer()

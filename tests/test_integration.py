@@ -6,7 +6,6 @@ Skip with: pytest tests/test_integration.py -v --skip-integration
 
 from __future__ import annotations
 
-import asyncio
 import os
 import pytest
 
@@ -26,8 +25,7 @@ def has_mcp_servers() -> bool:
 
 
 skip_no_servers = pytest.mark.skipif(
-    not has_mcp_servers(),
-    reason="No MCP servers configured in ~/.mcp.json"
+    not has_mcp_servers(), reason="No MCP servers configured in ~/.mcp.json"
 )
 
 
@@ -65,7 +63,9 @@ class TestServerConnection:
             # Check what connected
             statuses = manager.get_all_server_statuses()
             for status in statuses:
-                print(f"  {status.name}: {status.status.value} ({status.tool_count} tools)")
+                print(
+                    f"  {status.name}: {status.status.value} ({status.tool_count} tools)"
+                )
 
             # At least some should connect (network might be slow)
             online = [s for s in statuses if s.status.value == "online"]

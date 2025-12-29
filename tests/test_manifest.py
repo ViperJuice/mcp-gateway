@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from mcp_gateway.manifest.environment import (
-    Platform,
     detect_platform,
     probe_clis,
 )
@@ -19,7 +17,6 @@ from mcp_gateway.manifest.loader import (
     load_manifest,
 )
 from mcp_gateway.manifest.matcher import (
-    MatchResult,
     _keyword_match,
     match_capability,
 )
@@ -49,7 +46,9 @@ async def test_probe_clis_with_mocked_which():
     """Test CLI probing with mocked which."""
     with patch("mcp_gateway.manifest.environment.shutil.which") as mock_which:
         # Only git and docker are "installed"
-        mock_which.side_effect = lambda cmd: f"/usr/bin/{cmd}" if cmd in ("git", "docker") else None
+        mock_which.side_effect = (
+            lambda cmd: f"/usr/bin/{cmd}" if cmd in ("git", "docker") else None
+        )
 
         cli_configs = {
             "git": {"check_command": ["git", "--version"]},
@@ -128,7 +127,9 @@ def test_manifest_cli_config():
 
     git = manifest.get_cli("git")
     assert git is not None
-    assert "version control" in git.description.lower() or "git" in git.description.lower()
+    assert (
+        "version control" in git.description.lower() or "git" in git.description.lower()
+    )
     assert len(git.keywords) > 0
 
 

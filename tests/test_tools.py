@@ -3,18 +3,13 @@
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import MagicMock, AsyncMock
 
 import pytest
 
 from mcp_gateway.policy.policy import PolicyManager
 from mcp_gateway.tools.handlers import GatewayTools
 from mcp_gateway.types import (
-    CatalogSearchInput,
-    DescribeInput,
-    InvokeInput,
     RiskHint,
-    ServerStatusEnum,
     ToolInfo,
 )
 
@@ -126,9 +121,7 @@ class TestCatalogSearch:
 
     @pytest.mark.asyncio
     async def test_filters_by_server_name(self, gateway_tools: GatewayTools) -> None:
-        result = await gateway_tools.catalog_search(
-            {"filters": {"server": "github"}}
-        )
+        result = await gateway_tools.catalog_search({"filters": {"server": "github"}})
 
         assert len(result.results) == 2
         assert all(r.server == "github" for r in result.results)
@@ -145,9 +138,7 @@ class TestCatalogSearch:
 
     @pytest.mark.asyncio
     async def test_filters_by_risk_level(self, gateway_tools: GatewayTools) -> None:
-        result = await gateway_tools.catalog_search(
-            {"filters": {"risk_max": "low"}}
-        )
+        result = await gateway_tools.catalog_search({"filters": {"risk_max": "low"}})
 
         assert all(r.risk_hint == "low" for r in result.results)
 
@@ -196,9 +187,7 @@ class TestDescribe:
         assert any(a.name == "title" and a.required for a in result.args)
 
     @pytest.mark.asyncio
-    async def test_raises_for_unknown_tool(
-        self, gateway_tools: GatewayTools
-    ) -> None:
+    async def test_raises_for_unknown_tool(self, gateway_tools: GatewayTools) -> None:
         with pytest.raises(ValueError, match="Tool not found"):
             await gateway_tools.describe({"tool_id": "unknown::tool"})
 
