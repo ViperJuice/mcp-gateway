@@ -133,7 +133,9 @@ class GatewayError(BaseModel):
         default=None, description="Additional error context"
     )
     suggestion: str | None = Field(default=None, description="How to resolve the error")
-    retryable: bool = Field(default=False, description="Whether the operation can be retried")
+    retryable: bool = Field(
+        default=False, description="Whether the operation can be retried"
+    )
 
 
 class GatewayException(Exception):

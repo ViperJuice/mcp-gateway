@@ -83,7 +83,11 @@ async def _llm_match(
 ) -> MatchResult:
     """Use BAML/Groq for semantic matching."""
     from mcp_gateway.baml_client import b
-    from mcp_gateway.baml_client.types import ManifestCLI, ManifestServer, ManifestSummary
+    from mcp_gateway.baml_client.types import (
+        ManifestCLI,
+        ManifestServer,
+        ManifestSummary,
+    )
 
     running_servers = running_servers or []
 

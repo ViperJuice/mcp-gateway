@@ -326,13 +326,15 @@ async def run_status(args: argparse.Namespace) -> None:
     configs = load_configs(project_root=project_root, custom_config_path=config_path)
 
     # Filter by policy
-    allowed_configs = [
-        c for c in configs if policy_manager.is_server_allowed(c.name)
-    ]
+    allowed_configs = [c for c in configs if policy_manager.is_server_allowed(c.name)]
 
     if not allowed_configs:
         if args.json:
-            print(json.dumps({"servers": [], "tools": 0, "message": "No servers configured"}))
+            print(
+                json.dumps(
+                    {"servers": [], "tools": 0, "message": "No servers configured"}
+                )
+            )
         else:
             print("No MCP servers configured.")
         return
@@ -397,7 +399,11 @@ async def run_status(args: argparse.Namespace) -> None:
                 for s in statuses:
                     if s.status == ServerStatusEnum.ONLINE:
                         icon = "\u2713"  # checkmark
-                        avg_time = f"{s.avg_response_time_ms:.0f}ms" if s.avg_response_time_ms else "<1s"
+                        avg_time = (
+                            f"{s.avg_response_time_ms:.0f}ms"
+                            if s.avg_response_time_ms
+                            else "<1s"
+                        )
                         details = f"{s.tool_count:>3} tools   {avg_time} avg"
                     else:
                         icon = "\u2717"  # x mark
@@ -520,7 +526,11 @@ async def run_init(args: argparse.Namespace) -> None:
     # Common servers to suggest
     common_servers = [
         ("filesystem", "@modelcontextprotocol/server-filesystem", None),
-        ("github", "@modelcontextprotocol/server-github", "GITHUB_PERSONAL_ACCESS_TOKEN"),
+        (
+            "github",
+            "@modelcontextprotocol/server-github",
+            "GITHUB_PERSONAL_ACCESS_TOKEN",
+        ),
         ("postgres", "@modelcontextprotocol/server-postgres", "POSTGRES_URL"),
         ("sqlite", "@modelcontextprotocol/server-sqlite", None),
         ("puppeteer", "@anthropics/mcp-server-puppeteer", None),

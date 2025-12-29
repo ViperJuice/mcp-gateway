@@ -471,9 +471,7 @@ class TestStartInstall:
         assert job_id.isalnum()
 
     @pytest.mark.asyncio
-    async def test_start_install_creates_job(
-        self, server_config: ServerConfig
-    ) -> None:
+    async def test_start_install_creates_job(self, server_config: ServerConfig) -> None:
         """Job added to _jobs dict."""
         manager = JobManager.get_instance()
         job_id = await manager.start_install(server_config, "linux")
@@ -628,7 +626,9 @@ class TestMonitorInstall:
             name="test",
             description="Test",
             keywords=["test"],
-            install={"linux": ["bash", "-c", "for i in $(seq 1 30); do echo line$i; done"]},
+            install={
+                "linux": ["bash", "-c", "for i in $(seq 1 30); do echo line$i; done"]
+            },
             command="echo",
             args=["test"],
             requires_api_key=False,
@@ -793,9 +793,9 @@ class TestProgressParsing:
         ]
 
         for pattern in patterns:
-            assert manager._is_server_started(
-                pattern
-            ), f"Pattern not detected: {pattern}"
+            assert manager._is_server_started(pattern), (
+                f"Pattern not detected: {pattern}"
+            )
 
     def test_is_server_started_case_insensitive(self) -> None:
         """'INITIALIZED' detected."""

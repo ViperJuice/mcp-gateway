@@ -140,7 +140,9 @@ class GatewayServer:
             resources = self._client_manager.get_all_resources()
             # Filter by policy
             allowed_resources = [
-                r for r in resources if self._policy_manager.is_resource_allowed(r.resource_id)
+                r
+                for r in resources
+                if self._policy_manager.is_resource_allowed(r.resource_id)
             ]
             return [
                 Resource(
@@ -186,7 +188,9 @@ class GatewayServer:
             prompts = self._client_manager.get_all_prompts()
             # Filter by policy
             allowed_prompts = [
-                p for p in prompts if self._policy_manager.is_prompt_allowed(p.prompt_id)
+                p
+                for p in prompts
+                if self._policy_manager.is_prompt_allowed(p.prompt_id)
             ]
             return [
                 Prompt(
@@ -224,7 +228,9 @@ class GatewayServer:
                 messages=[
                     PromptMessage(
                         role=m.get("role", "user"),
-                        content=TextContent(type="text", text=m.get("content", {}).get("text", "")),
+                        content=TextContent(
+                            type="text", text=m.get("content", {}).get("text", "")
+                        ),
                     )
                     for m in messages
                 ],

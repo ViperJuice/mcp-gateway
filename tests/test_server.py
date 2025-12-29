@@ -91,7 +91,9 @@ class TestResourceHandlers:
         )
 
         server = GatewayServer(policy_path=policy_file)
-        assert not server._policy_manager.is_resource_allowed("test::file:///secret.env")
+        assert not server._policy_manager.is_resource_allowed(
+            "test::file:///secret.env"
+        )
         assert server._policy_manager.is_resource_allowed("test::file:///readme.md")
 
 

@@ -308,7 +308,9 @@ class ClientManager:
             # Process resources result
             resources_result = listing_results[0]
             if isinstance(resources_result, BaseException):
-                logger.debug(f"Server {name} doesn't support resources: {resources_result}")
+                logger.debug(
+                    f"Server {name} doesn't support resources: {resources_result}"
+                )
             else:
                 resources = resources_result.get("resources", [])
                 for resource in resources:
@@ -714,9 +716,7 @@ class ClientManager:
 
         managed = self._clients.get(resource_info.server_name)
         if not managed or not managed.process:
-            raise RuntimeError(
-                f"Server {resource_info.server_name} is not connected"
-            )
+            raise RuntimeError(f"Server {resource_info.server_name} is not connected")
 
         if managed.status.status != ServerStatusEnum.ONLINE:
             raise RuntimeError(
