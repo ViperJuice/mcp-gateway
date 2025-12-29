@@ -76,5 +76,6 @@ jobs:
         run: uv sync --all-extras
 
       - name: Run mypy
-        run: uv run mypy src/mcp_gateway --ignore-missing-imports
+        run: uv run mypy src/mcp_gateway --exclude baml_client
+        # TODO: Remove continue-on-error once type issues in matcher.py, cli.py, manager.py are fixed
         continue-on-error: true

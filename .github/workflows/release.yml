@@ -22,8 +22,8 @@ jobs:
       - name: Install dependencies
         run: uv sync --all-extras
 
-      - name: Run tests
-        run: uv run pytest tests/ -v
+      - name: Run tests with coverage
+        run: uv run pytest tests/ -v --cov=mcp_gateway --cov-fail-under=60
 
       - name: Build package
         run: uv build

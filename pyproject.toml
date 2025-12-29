@@ -60,9 +60,19 @@ packages = ["src/mcp_gateway"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+filterwarnings = [
+    # Suppress coroutine warnings from test mocks
+    "ignore:coroutine .* was never awaited:RuntimeWarning",
+    # Suppress event loop closed warnings from subprocess cleanup
+    "ignore::pytest.PytestUnraisableExceptionWarning:",
+]
 
 [tool.ruff]
 exclude = ["src/mcp_gateway/baml_client"]
+
+[tool.mypy]
+exclude = "baml_client"
+ignore_missing_imports = true
 
 [tool.coverage.run]
 source = ["src/mcp_gateway"]
