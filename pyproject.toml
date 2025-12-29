@@ -43,6 +43,7 @@ dev = [
     "pytest-cov>=4.0",
     "ruff>=0.8.0",
     "mypy>=1.0",
+    "types-PyYAML>=6.0",
 ]
 llm = [
     "baml-py>=0.215.0",
@@ -73,6 +74,10 @@ exclude = ["src/mcp_gateway/baml_client"]
 [tool.mypy]
 exclude = "baml_client"
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "mcp_gateway.baml_client.*"
+ignore_errors = true
 
 [tool.coverage.run]
 source = ["src/mcp_gateway"]

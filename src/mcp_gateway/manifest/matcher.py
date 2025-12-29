@@ -79,76 +79,91 @@ async def _llm_match(
     query: str,
     manifest: Manifest,
     detected_clis: set[str],
+    running_servers: list[str] | None = None,
 ) -> MatchResult:
     """Use BAML/Groq for semantic matching."""
     from mcp_gateway.baml_client import b
-    from mcp_gateway.baml_client.types import ManifestEntry
+    from mcp_gateway.baml_client.types import ManifestCLI, ManifestServer, ManifestSummary
 
-    # Build manifest entries for LLM
-    entries: list[ManifestEntry] = []
+    running_servers = running_servers or []
 
-    # Add detected CLIs first (preferred)
-    for name, cli in manifest.cli_alternatives.items():
-        if name in detected_clis:
-            entries.append(
-                ManifestEntry(
-                    name=name,
-                    entry_type="cli",
-                    keywords=cli.keywords,
-                    description=cli.description,
-                )
-            )
+    # Build ManifestSummary for the LLM
+    servers: list[ManifestServer] = []
+    clis: list[ManifestCLI] = []
 
-    # Add servers
+    # Add all servers
     for name, server in manifest.servers.items():
-        entries.append(
-            ManifestEntry(
+        servers.append(
+            ManifestServer(
                 name=name,
-                entry_type="server",
-                keywords=server.keywords,
                 description=server.description,
+                keywords=server.keywords,
+                requires_api_key=server.requires_api_key,
+                env_var=server.env_var,
             )
         )
 
-    # Add non-detected CLIs last (less preferred since not installed)
+    # Add all CLIs
     for name, cli in manifest.cli_alternatives.items():
-        if name not in detected_clis:
-            entries.append(
-                ManifestEntry(
-                    name=name,
-                    entry_type="cli",
-                    keywords=cli.keywords,
-                    description=f"{cli.description} (not installed)",
-                )
+        clis.append(
+            ManifestCLI(
+                name=name,
+                description=cli.description,
+                keywords=cli.keywords,
             )
+        )
 
-    # Call BAML function
-    result = await b.MatchCapabilityRequest(query, entries)
+    manifest_summary = ManifestSummary(servers=servers, clis=clis)
 
-    if not result.matched:
+    # Call BAML function with new API
+    result = await b.MatchCapability(
+        query=query,
+        manifest=manifest_summary,
+        available_clis=list(detected_clis),
+        running_servers=running_servers,
+    )
+
+    # Check if we have any viable candidates
+    if not result.candidates:
         return MatchResult(
             matched=False,
             entry_name="",
             entry_type="",
             confidence=0.0,
-            reasoning=result.reasoning,
+            reasoning=result.recommendation or "No matching capability found",
+        )
+
+    # Get the best candidate (first one with high enough relevance)
+    best_candidate = result.candidates[0]
+
+    # Threshold for accepting a match
+    if best_candidate.relevance_score < 0.3:
+        return MatchResult(
+            matched=False,
+            entry_name="",
+            entry_type="",
+            confidence=best_candidate.relevance_score,
+            reasoning=f"Best match '{best_candidate.name}' has low relevance: {best_candidate.reasoning}",
         )
 
     # Resolve the matched entry
     cli_config = None
     server_config = None
+    entry_type: Literal["cli", "server", ""] = ""
 
-    if result.entry_type == "cli":
-        cli_config = manifest.get_cli(result.entry_name)
-    elif result.entry_type == "server":
-        server_config = manifest.get_server(result.entry_name)
+    if best_candidate.candidate_type == "cli":
+        cli_config = manifest.get_cli(best_candidate.name)
+        entry_type = "cli"
+    elif best_candidate.candidate_type == "server":
+        server_config = manifest.get_server(best_candidate.name)
+        entry_type = "server"
 
     return MatchResult(
         matched=True,
-        entry_name=result.entry_name,
-        entry_type=result.entry_type,  # type: ignore
-        confidence=result.confidence,
-        reasoning=result.reasoning,
+        entry_name=best_candidate.name,
+        entry_type=entry_type,
+        confidence=best_candidate.relevance_score,
+        reasoning=best_candidate.reasoning,
         cli_config=cli_config,
         server_config=server_config,
     )

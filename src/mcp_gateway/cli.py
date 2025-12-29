@@ -512,7 +512,7 @@ async def run_init(args: argparse.Namespace) -> None:
     # Load manifest to get available servers
     try:
         manifest = load_manifest()
-        available_servers = list(manifest.mcp_servers.keys())
+        available_servers = list(manifest.servers.keys())
     except Exception:
         available_servers = []
         print("Warning: Could not load server manifest.")

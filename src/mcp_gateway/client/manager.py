@@ -307,7 +307,7 @@ class ClientManager:
 
             # Process resources result
             resources_result = listing_results[0]
-            if isinstance(resources_result, Exception):
+            if isinstance(resources_result, BaseException):
                 logger.debug(f"Server {name} doesn't support resources: {resources_result}")
             else:
                 resources = resources_result.get("resources", [])
@@ -327,7 +327,7 @@ class ClientManager:
 
             # Process prompts result
             prompts_result = listing_results[1]
-            if isinstance(prompts_result, Exception):
+            if isinstance(prompts_result, BaseException):
                 logger.debug(f"Server {name} doesn't support prompts: {prompts_result}")
             else:
                 prompts = prompts_result.get("prompts", [])
