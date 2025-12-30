@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "gateway-mcp"
+name = "pmcp"
 version = "1.0.1"
 description = "MCP Gateway - A meta-server for minimal Claude Code tool bloat with progressive disclosure"
 readme = "README.md"
@@ -32,9 +32,9 @@ dependencies = [
 ]
 
 [project.urls]
-Repository = "https://github.com/ViperJuice/mcp-gateway"
-Homepage = "https://github.com/ViperJuice/mcp-gateway"
-Issues = "https://github.com/ViperJuice/mcp-gateway/issues"
+Repository = "https://github.com/ViperJuice/pmcp"
+Homepage = "https://github.com/ViperJuice/pmcp"
+Issues = "https://github.com/ViperJuice/pmcp/issues"
 
 [project.optional-dependencies]
 dev = [
@@ -49,7 +49,7 @@ llm = [
     "baml-py>=0.215.0",
 ]
 all = [
-    "gateway-mcp[dev,llm]",
+    "pmcp[dev,llm]",
 ]
 
 [project.scripts]

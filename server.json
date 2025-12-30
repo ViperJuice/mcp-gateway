@@ -5,12 +5,12 @@
   "packages": [
     {
       "registry_type": "pypi",
-      "identifier": "gateway-mcp",
+      "identifier": "pmcp",
       "version": "1.0.0"
     }
   ],
   "keywords": ["gateway", "meta-server", "aggregator", "progressive-disclosure", "dynamic-provisioning"],
-  "repository": "https://github.com/ViperJuice/mcp-gateway",
-  "homepage": "https://github.com/ViperJuice/mcp-gateway",
+  "repository": "https://github.com/ViperJuice/pmcp",
+  "homepage": "https://github.com/ViperJuice/pmcp",
   "license": "MIT"
 }
