@@ -13,6 +13,7 @@ from mcp.types import Tool
 from pmcp.client.manager import ClientManager
 from pmcp.config.loader import load_configs, manifest_server_to_config
 from pmcp.errors import ErrorCode, GatewayException, make_error
+from pmcp.identity import filter_self_references
 from pmcp.manifest.environment import detect_platform, probe_clis
 from pmcp.manifest.installer import (
     MissingApiKeyError,
@@ -611,7 +612,8 @@ class GatewayTools:
             )
 
             # Filter out the gateway itself to prevent recursive connection
-            configs = [c for c in configs if c.name != "mcp-gateway"]
+            # Uses command-based detection, not just name matching
+            configs = filter_self_references(configs)
             seen_servers = {c.name for c in configs}
 
             # Load manifest and add auto-start servers (if not already configured)

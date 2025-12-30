@@ -24,6 +24,7 @@ from pydantic import AnyUrl
 
 from pmcp.client.manager import ClientManager
 from pmcp.config.loader import load_configs, manifest_server_to_config
+from pmcp.identity import filter_self_references, acquire_singleton_lock, release_singleton_lock
 from pmcp.manifest.loader import load_manifest
 from pmcp.manifest.refresher import (
     get_cache_path,
@@ -258,7 +259,8 @@ class GatewayServer:
         )
 
         # Filter out the gateway itself to prevent recursive connection
-        configs = [c for c in configs if c.name != "mcp-gateway"]
+        # Uses command-based detection, not just name matching
+        configs = filter_self_references(configs)
         seen_servers = {c.name for c in configs}
 
         # Load manifest and add auto-start servers (if not already configured)
@@ -353,6 +355,14 @@ class GatewayServer:
         """Run the MCP server (stdio transport)."""
         from mcp.server.stdio import stdio_server
 
+        # Acquire singleton lock to prevent multiple gateway instances
+        if not acquire_singleton_lock(self._cache_dir):
+            logger.error(
+                "Another gateway instance is already running. "
+                "Only one gateway should run at a time to prevent recursive spawning."
+            )
+            raise RuntimeError("Another gateway instance is already running")
+
         await self.initialize()
 
         if self._server is None:
@@ -378,4 +388,7 @@ class GatewayServer:
             logger.warning("Shutdown timed out, forcing disconnect")
         except Exception as e:
             logger.error(f"Error during shutdown: {e}")
+        finally:
+            # Always release singleton lock
+            release_singleton_lock()
         logger.info("MCP Gateway shut down")
