@@ -76,4 +76,4 @@ jobs:
         run: uv sync --all-extras
 
       - name: Run mypy
-        run: uv run mypy src/mcp_gateway --exclude baml_client
+        run: uv run mypy src/pmcp --exclude baml_client

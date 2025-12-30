@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from mcp_gateway.summary.template_fallback import (
+from pmcp.summary.template_fallback import (
     extract_capabilities,
     group_by_server,
     template_summary,
 )
-from mcp_gateway.summary.generator import generate_capability_summary
-from mcp_gateway.types import RiskHint, ToolInfo
+from pmcp.summary.generator import generate_capability_summary
+from pmcp.types import RiskHint, ToolInfo
 
 
 def make_tool(

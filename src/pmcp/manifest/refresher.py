@@ -16,13 +16,13 @@ from pathlib import Path
 
 import yaml
 
-from mcp_gateway.manifest.loader import Manifest, ServerConfig, load_manifest
-from mcp_gateway.manifest.version_checker import (
+from pmcp.manifest.loader import Manifest, ServerConfig, load_manifest
+from pmcp.manifest.version_checker import (
     detect_package_type,
     get_package_version,
     is_version_newer,
 )
-from mcp_gateway.types import (
+from pmcp.types import (
     DescriptionsCache,
     GeneratedServerDescriptions,
     PrebuiltToolInfo,
@@ -299,8 +299,8 @@ async def _generate_capability_summary(
 
     # Try BAML summarization
     try:
-        from mcp_gateway.baml_client import b
-        from mcp_gateway.baml_client.types import ToolDescription
+        from pmcp.baml_client import b
+        from pmcp.baml_client.types import ToolDescription
 
         tool_descriptions = [
             ToolDescription(

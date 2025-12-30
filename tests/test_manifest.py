@@ -8,11 +8,11 @@ from unittest.mock import patch
 
 import pytest
 
-from mcp_gateway.manifest.environment import (
+from pmcp.manifest.environment import (
     detect_platform,
     probe_clis,
 )
-from mcp_gateway.manifest.installer import (
+from pmcp.manifest.installer import (
     InstallError,
     InstallJob,
     JobManager,
@@ -21,13 +21,13 @@ from mcp_gateway.manifest.installer import (
     install_server,
     verify_installation,
 )
-from mcp_gateway.manifest.loader import (
+from pmcp.manifest.loader import (
     CLIAlternative,
     Manifest,
     ServerConfig,
     load_manifest,
 )
-from mcp_gateway.manifest.matcher import (
+from pmcp.manifest.matcher import (
     _keyword_match,
     match_capability,
 )
@@ -49,7 +49,7 @@ def test_detect_platform():
 @pytest.mark.asyncio
 async def test_probe_clis_with_mocked_which():
     """Test CLI probing with mocked which."""
-    with patch("mcp_gateway.manifest.environment.shutil.which") as mock_which:
+    with patch("pmcp.manifest.environment.shutil.which") as mock_which:
         # Only git and docker are "installed"
         mock_which.side_effect = (
             lambda cmd: f"/usr/bin/{cmd}" if cmd in ("git", "docker") else None

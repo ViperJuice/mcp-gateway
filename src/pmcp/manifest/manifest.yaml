@@ -449,4 +449,4 @@ servers:
     env_instructions: "Set AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, and AWS_REGION"
 
 # Discovery queue location
-discovery_queue_path: ".mcp-gateway/discovery_queue.json"
+discovery_queue_path: ".pmcp/discovery_queue.json"

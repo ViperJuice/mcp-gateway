@@ -1,60 +1,30 @@
-# MCP Gateway
+# PMCP - Progressive MCP
 
-<!-- mcp-name: io.github.ViperJuice/gateway-mcp -->
+<!-- mcp-name: io.github.ViperJuice/pmcp -->
 
-[![PyPI version](https://badge.fury.io/py/gateway-mcp.svg)](https://pypi.org/project/gateway-mcp/)
+[![PyPI version](https://badge.fury.io/py/pmcp.svg)](https://pypi.org/project/pmcp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A meta-server for minimal Claude Code tool bloat with progressive disclosure and dynamic server provisioning.
+**Progressive disclosure for MCP** - Minimal context bloat with on-demand tool discovery and dynamic server provisioning.
 
-## Why This Exists
+## The Problem
 
 When Claude Code connects directly to multiple MCP servers (GitHub, Jira, DB, etc.), it loads **all** tool schemas into context. This causes:
-- **Tool bloat**: Dozens of tool definitions consume context tokens
+- **Context bloat**: Dozens of tool definitions consume tokens before you even ask a question
 - **Static configuration**: Requires Claude Code restart to see new servers
 - **No progressive disclosure**: Full schemas shown even when not needed
 
-**MCP Gateway solves this** by acting as a single MCP server that Claude Code connects to. The gateway:
-- Exposes only **9 stable meta-tools** (not the underlying tools)
+Anthropic has [highlighted context bloat](https://www.anthropic.com/news) as a key challenge with MCP tooling.
+
+## The Solution
+
+**PMCP** acts as a single MCP server that Claude Code connects to. Instead of exposing all downstream tools, it provides:
+
+- **9 stable meta-tools** (not the 50+ underlying tools)
 - **Auto-starts** essential servers (Playwright, Context7) with no configuration
 - **Dynamically provisions** new servers on-demand from a manifest of 25+
-- Returns **compact capability cards** first, detailed schemas only on request
-- Enforces output size caps and optional secret redaction
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        Claude Code                          │
-│  Only connects to mcp-gateway (single server in config)     │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-                             ▼
-┌─────────────────────────────────────────────────────────────┐
-│                       MCP Gateway                           │
-│  • 9 meta-tools (catalog, invoke, provision, etc.)          │
-│  • Progressive disclosure (compact cards → full schemas)    │
-│  • Policy enforcement (allow/deny lists)                    │
-└────────────────────────────┬────────────────────────────────┘
-                             │
-        ┌────────────────────┼────────────────────┐
-        ▼                    ▼                    ▼
-┌───────────────┐  ┌─────────────────┐  ┌─────────────────┐
-│  Auto-Start   │  │    Manifest     │  │  Custom Servers │
-│  (Playwright, │  │   (25+ servers  │  │  (your own MCP  │
-│   Context7)   │  │   on-demand)    │  │  servers)       │
-└───────────────┘  └─────────────────┘  └─────────────────┘
-```
-
-**Key principle**: Users configure ONLY `mcp-gateway` in Claude Code.
-The gateway discovers and manages all other servers.
-
-### Why Single-Gateway?
-
-1. **No tool bloat** - Claude sees 9 tools, not 50+
-2. **No restarts** - Provision new servers without restarting Claude Code
-3. **Consistent interface** - All tools accessed via `gateway.invoke`
-4. **Policy control** - Centralized allow/deny rules
+- **Progressive disclosure**: Compact capability cards first, detailed schemas only on request
+- **Policy enforcement**: Output size caps and optional secret redaction
 
 ## Quick Start
 
@@ -62,17 +32,16 @@ The gateway discovers and manages all other servers.
 
 ```bash
 # With pip
-pip install gateway-mcp
+pip install pmcp
 
 # With uv (recommended)
-uv pip install gateway-mcp
+uv pip install pmcp
 
 # Or run directly with uvx
-uvx gateway-mcp
+uvx pmcp
 
 # With LLM capability matching (optional)
-pip install gateway-mcp[llm]
-uv pip install gateway-mcp[llm]
+pip install pmcp[llm]
 ```
 
 ### Configure Claude Code
@@ -83,14 +52,14 @@ Create/update `~/.claude/mcp.json`:
 {
   "mcpServers": {
     "gateway": {
-      "command": "mcp-gateway",
+      "command": "pmcp",
       "args": []
     }
   }
 }
 ```
 
-That's it! The gateway auto-starts with Playwright and Context7 servers ready to use.
+That's it! PMCP auto-starts with Playwright and Context7 servers ready to use.
 
 ### Your First Interaction
 
@@ -105,6 +74,41 @@ Claude uses: gateway.invoke {
 
 Returns: Screenshot of google.com
 ```
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        Claude Code                          │
+│  Only connects to PMCP (single server in config)            │
+└────────────────────────────┬────────────────────────────────┘
+                             │
+                             ▼
+┌─────────────────────────────────────────────────────────────┐
+│                          PMCP                               │
+│  • 9 meta-tools (catalog, invoke, provision, etc.)          │
+│  • Progressive disclosure (compact cards → full schemas)    │
+│  • Policy enforcement (allow/deny lists)                    │
+└────────────────────────────┬────────────────────────────────┘
+                             │
+        ┌────────────────────┼────────────────────┐
+        ▼                    ▼                    ▼
+┌───────────────┐  ┌─────────────────┐  ┌─────────────────┐
+│  Auto-Start   │  │    Manifest     │  │  Custom Servers │
+│  (Playwright, │  │   (25+ servers  │  │  (your own MCP  │
+│   Context7)   │  │   on-demand)    │  │  servers)       │
+└───────────────┘  └─────────────────┘  └─────────────────┘
+```
+
+**Key principle**: Users configure ONLY `pmcp` in Claude Code.
+The gateway discovers and manages all other servers.
+
+### Why Single-Gateway?
+
+1. **No context bloat** - Claude sees 9 tools, not 50+
+2. **No restarts** - Provision new servers without restarting Claude Code
+3. **Consistent interface** - All tools accessed via `gateway.invoke`
+4. **Policy control** - Centralized allow/deny rules
 
 ## Gateway Tools
 
@@ -129,28 +133,9 @@ The gateway exposes **9 meta-tools** organized into two categories:
 | `gateway.provision` | Install and start MCP servers on-demand |
 | `gateway.provision_status` | Check installation progress |
 
-## Auto-Start Servers
-
-These servers start automatically with the gateway (no configuration required):
-
-| Server | Description | API Key |
-|--------|-------------|---------|
-| `playwright` | Browser automation - navigation, screenshots, DOM inspection | Not required |
-| `context7` | Library documentation lookup - up-to-date docs for any package | Optional (for higher rate limits) |
-
-To disable auto-start servers, add them to your policy denylist:
-
-```yaml
-# ~/.claude/gateway-policy.yaml
-servers:
-  denylist:
-    - playwright
-    - context7
-```
-
 ## Progressive Disclosure Workflow
 
-MCP Gateway follows a progressive disclosure pattern - start with natural language, get recommendations, drill down as needed.
+PMCP follows a progressive disclosure pattern - start with natural language, get recommendations, drill down as needed.
 
 ### Step 1: Request a Capability
 
@@ -198,7 +183,7 @@ gateway.invoke({
 
 ## Dynamic Server Provisioning
 
-MCP Gateway can install and start MCP servers on-demand from a curated manifest of 25+ servers.
+PMCP can install and start MCP servers on-demand from a curated manifest of 25+ servers.
 
 ### Example: Adding GitHub Support
 
@@ -233,32 +218,23 @@ export GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...
 gateway.provision({ server_name: "github" })
 ```
 
-Returns:
-```json
-{
-  "ok": true,
-  "status": "started",
-  "job_id": "abc123",
-  "message": "Installation started. Poll gateway.provision_status for progress."
-}
-```
+## Auto-Start Servers
 
-### Check Progress
+These servers start automatically (no configuration required):
 
-```
-gateway.provision_status({ job_id: "abc123" })
-```
+| Server | Description | API Key |
+|--------|-------------|---------|
+| `playwright` | Browser automation - navigation, screenshots, DOM inspection | Not required |
+| `context7` | Library documentation lookup - up-to-date docs for any package | Optional (for higher rate limits) |
 
 ## Available Servers
 
-The gateway includes a manifest of 25+ servers that can be provisioned on-demand:
+The manifest includes 25+ servers that can be provisioned on-demand:
 
 ### No API Key Required
 
 | Server | Description |
 |--------|-------------|
-| `playwright` | Browser automation (auto-start) |
-| `context7` | Library documentation (auto-start) |
 | `filesystem` | File operations - read, write, search |
 | `memory` | Persistent knowledge graph |
 | `fetch` | HTTP requests with robots.txt compliance |
@@ -288,17 +264,15 @@ See `.env.example` for all supported environment variables.
 
 ### Config Discovery
 
-The gateway discovers MCP servers from:
+PMCP discovers MCP servers from:
 
 1. **Project config**: `.mcp.json` in project root (highest priority)
 2. **User config**: `~/.mcp.json` or `~/.claude/.mcp.json`
-3. **Custom config**: Via `--config` flag or `MCP_GATEWAY_CONFIG` env var
-
-Project configs override user configs when server names collide.
+3. **Custom config**: Via `--config` flag or `PMCP_CONFIG` env var
 
 ### Adding Custom Servers
 
-For MCP servers not in the manifest (your own or third-party), add them to `~/.mcp.json`:
+For MCP servers not in the manifest, add them to `~/.mcp.json`:
 
 ```json
 {
@@ -314,10 +288,7 @@ For MCP servers not in the manifest (your own or third-party), add them to `~/.m
 }
 ```
 
-The gateway automatically discovers and connects to these on startup.
-Custom servers are accessed through the gateway—not directly by Claude Code.
-
-**Important**: Don't add `mcp-gateway` itself to this file. The gateway is configured
+**Important**: Don't add `pmcp` itself to this file. PMCP is configured
 in Claude Code's config (`~/.claude/mcp.json`), not in the downstream server list.
 
 ### Policy File
@@ -327,14 +298,11 @@ Create a policy file to control access and limits:
 **~/.claude/gateway-policy.yaml**:
 ```yaml
 servers:
-  # Only allow specific servers (empty = allow all)
-  allowlist: []
-  # Block specific servers
+  allowlist: []  # Empty = allow all
   denylist:
     - dangerous-server
 
 tools:
-  # Block dangerous tool patterns
   denylist:
     - "*::delete_*"
     - "*::drop_*"
@@ -354,157 +322,55 @@ redaction:
 
 ```bash
 # Start the gateway server (default)
-mcp-gateway
+pmcp
 
 # Check server status
-mcp-gateway status
-mcp-gateway status --json              # JSON output
-mcp-gateway status --server playwright # Filter by server
-mcp-gateway status --pending           # Show pending requests
+pmcp status
+pmcp status --json              # JSON output
+pmcp status --server playwright # Filter by server
 
 # View logs
-mcp-gateway logs
-mcp-gateway logs --follow              # Live tail
-mcp-gateway logs --tail 100            # Last 100 lines
-mcp-gateway logs --level error         # Filter by level
+pmcp logs
+pmcp logs --follow              # Live tail
+pmcp logs --tail 100            # Last 100 lines
 
 # Refresh server connections
-mcp-gateway refresh
-mcp-gateway refresh --server github    # Refresh specific server
-mcp-gateway refresh --force            # Force reconnect all
+pmcp refresh
+pmcp refresh --server github    # Refresh specific server
+pmcp refresh --force            # Force reconnect all
 
 # Initialize config (interactive)
-mcp-gateway init
-mcp-gateway init --project ./myapp     # Specify project directory
-mcp-gateway init --force               # Overwrite existing config
-```
-
-### CLI Options
-
-```
-mcp-gateway [OPTIONS] [COMMAND]
-
-OPTIONS:
-  -h, --help              Show help
-  -p, --project <path>    Project root for .mcp.json discovery
-  -c, --config <path>     Custom MCP config file
-  --policy <path>         Policy file (YAML or JSON)
-  -l, --log-level <level> debug|info|warn|error (default: info)
-  --debug                 Enable debug logging
-  -q, --quiet             Only show errors
-
-COMMANDS:
-  status                  Show server and tool status
-  logs                    View gateway logs
-  refresh                 Reload configurations
-  init                    Initialize project config
-
-ENVIRONMENT:
-  MCP_GATEWAY_CONFIG      Custom config file path
-  MCP_GATEWAY_POLICY      Policy file path
-  MCP_GATEWAY_LOG_LEVEL   Log level
+pmcp init
 ```
 
 ## Docker
-
-Run the gateway in a container:
 
 ```bash
 # Using Docker
 docker run -it --rm \
   -v ~/.mcp.json:/home/appuser/.mcp.json:ro \
   -v ~/.env:/app/.env:ro \
-  ghcr.io/viperjuice/mcp-gateway:latest
+  ghcr.io/viperjuice/pmcp:latest
 
 # Using Docker Compose
 docker-compose up -d
-```
-
-Build locally:
-
-```bash
-docker build -t mcp-gateway .
-docker run -it --rm mcp-gateway --help
-```
-
-## Health Monitoring
-
-The gateway tracks health of all connections and pending requests.
-
-### Check Health
-
-```
-gateway.health()
-```
-
-Returns server status, tool counts, and last refresh timestamp.
-
-### Monitor Long-Running Requests
-
-```
-gateway.list_pending()
-gateway.list_pending({ server: "playwright" })
-```
-
-Returns pending requests with elapsed time and heartbeat status.
-
-### Cancel Stuck Requests
-
-```
-gateway.cancel({ request_id: "playwright::42" })
-gateway.cancel({ request_id: "playwright::42", force: true })
-```
-
-Cancels a pending request. Use `force: true` to cancel even if the request has a recent heartbeat.
-
-## MCP Resources & Prompts
-
-The gateway proxies MCP resources and prompts from downstream servers.
-
-### Resources
-
-Resources are discoverable via the standard MCP protocol:
-
-```
-# List all resources (via MCP)
-resources/list
-
-# Read a resource
-resources/read { uri: "file:///path/to/file" }
-```
-
-Resources are filtered by policy - see [Policy File](#policy-file).
-
-### Prompts
-
-Prompts are also proxied from downstream servers:
-
-```
-# List all prompts (via MCP)
-prompts/list
-
-# Get a prompt
-prompts/get { name: "server::prompt-name" }
 ```
 
 ## Development
 
 ```bash
 # Clone the repo
-git clone https://github.com/ViperJuice/mcp-gateway
-cd mcp-gateway
+git clone https://github.com/ViperJuice/pmcp
+cd pmcp
 
 # Install with uv (recommended)
 uv sync --all-extras
-
-# Or with pip
-pip install -e ".[dev]"
 
 # Run tests
 uv run pytest
 
 # Run with debug logging
-uv run mcp-gateway --debug
+uv run pmcp --debug
 ```
 
 ### Running Tests
@@ -514,7 +380,7 @@ uv run mcp-gateway --debug
 uv run pytest
 
 # Run with coverage
-uv run pytest --cov=mcp_gateway
+uv run pytest --cov=pmcp
 
 # Run specific test file
 uv run pytest tests/test_policy.py -v
@@ -523,41 +389,30 @@ uv run pytest tests/test_policy.py -v
 ### Project Structure
 
 ```
-mcp-gateway/
-├── src/mcp_gateway/
+pmcp/
+├── src/pmcp/
 │   ├── __init__.py
-│   ├── __main__.py           # python -m mcp_gateway entry
+│   ├── __main__.py           # python -m pmcp entry
 │   ├── cli.py                # CLI commands (status, logs, init, refresh)
 │   ├── server.py             # MCP server implementation
-│   ├── types.py              # Pydantic models
-│   ├── errors.py             # Error codes and exceptions
 │   ├── config/
 │   │   └── loader.py         # Config discovery (.mcp.json)
 │   ├── client/
-│   │   └── manager.py        # Downstream server connections (parallel, retry)
+│   │   └── manager.py        # Downstream server connections
 │   ├── policy/
-│   │   └── policy.py         # Allow/deny lists for servers/tools/resources/prompts
+│   │   └── policy.py         # Allow/deny lists
 │   ├── tools/
 │   │   └── handlers.py       # Gateway tool implementations
 │   ├── manifest/
 │   │   ├── manifest.yaml     # Server manifest (25+ servers)
 │   │   ├── loader.py         # Manifest loading
-│   │   ├── matcher.py        # Capability matching
 │   │   ├── installer.py      # Server provisioning
 │   │   └── environment.py    # Platform/CLI detection
 │   └── baml_client/          # BAML-generated LLM client (optional)
-├── .github/
-│   ├── dependabot.yml        # Dependency auto-updates
-│   └── workflows/
-│       ├── test.yml          # CI tests, lint, typecheck
-│       ├── release.yml       # PyPI publishing
-│       └── docker.yml        # Docker image builds
-├── config/
-│   └── .mcp.json.example     # Example config for Docker
-├── tests/                    # 290+ tests, 65%+ coverage
-├── Dockerfile                # Multi-stage build
+├── tests/                    # 310+ tests
+├── Dockerfile
 ├── docker-compose.yml
-├── .env.example              # API key configuration template
+├── .env.example
 ├── pyproject.toml
 └── README.md
 ```
@@ -567,111 +422,27 @@ mcp-gateway/
 ### Server Won't Connect
 
 ```bash
-# Check server status
-mcp-gateway status
-
-# View detailed logs
-mcp-gateway logs --level debug
-
-# Try refreshing connections
-mcp-gateway refresh --force
+pmcp status
+pmcp logs --level debug
+pmcp refresh --force
 ```
 
 ### Missing API Key
 
-If a server requires an API key, set it in your environment or `.env` file:
-
 ```bash
 # Check which key is needed
-mcp-gateway status --server github
+pmcp status --server github
 
 # Set the key
 export GITHUB_PERSONAL_ACCESS_TOKEN=ghp_...
-
-# Or add to .env
-echo "GITHUB_PERSONAL_ACCESS_TOKEN=ghp_..." >> .env
 ```
 
 ### Tool Invocation Fails
 
-```bash
-# Check if tool exists
+```
 gateway.catalog_search({ query: "tool-name" })
-
-# Get detailed schema
 gateway.describe({ tool_id: "server::tool-name" })
-
-# Check pending requests
 gateway.list_pending()
-```
-
-### Connection Timeouts
-
-The gateway uses exponential backoff retry (1s, 2s, 4s) for transient failures. If connections still fail:
-
-```bash
-# Increase log verbosity
-mcp-gateway --debug
-
-# Check if server process is running
-mcp-gateway status --verbose
-```
-
-### Policy Blocking Access
-
-If tools/resources/prompts are blocked by policy:
-
-```yaml
-# Check your policy file (~/.claude/gateway-policy.yaml)
-# Remove items from denylist or add to allowlist
-
-servers:
-  allowlist: []    # Empty = allow all
-  denylist: []
-
-tools:
-  denylist: []     # Remove blocking patterns
-
-resources:
-  denylist: []
-
-prompts:
-  denylist: []
-```
-
-## Architecture
-
-```
-┌─────────────────┐
-│  Claude Code    │
-│     TUI         │
-└────────┬────────┘
-         │ MCP (stdio)
-         │ 9 tools only
-         ▼
-┌─────────────────┐
-│  MCP Gateway    │
-│  ┌───────────┐  │
-│  │ Catalog   │  │  ◄─── Progressive disclosure
-│  │ Registry  │  │
-│  └───────────┘  │
-│  ┌───────────┐  │
-│  │ Manifest  │  │  ◄─── 25+ provisionable servers
-│  │ + Matcher │  │
-│  └───────────┘  │
-│  ┌───────────┐  │
-│  │ Policy    │  │  ◄─── Allow/deny, limits
-│  │ Manager   │  │
-│  └───────────┘  │
-└────────┬────────┘
-         │ MCP (stdio) × N
-         │
-    ┌────┴────┬────────┬────────┐
-    ▼         ▼        ▼        ▼
-┌───────┐ ┌───────┐ ┌───────┐ ┌───────┐
-│Playwrt│ │Context│ │GitHub │ │ ...   │
-│(auto) │ │(auto) │ │(prov) │ │       │
-└───────┘ └───────┘ └───────┘ └───────┘
 ```
 
 ## License

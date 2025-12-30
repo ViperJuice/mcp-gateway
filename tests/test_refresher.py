@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from mcp_gateway.manifest.refresher import (
+from pmcp.manifest.refresher import (
     GATEWAY_VERSION,
     _escape_yaml_string,
     _extract_tags,
@@ -19,7 +19,7 @@ from mcp_gateway.manifest.refresher import (
     load_descriptions_cache,
     save_descriptions_cache,
 )
-from mcp_gateway.types import (
+from pmcp.types import (
     DescriptionsCache,
     GeneratedServerDescriptions,
     PrebuiltToolInfo,
@@ -420,11 +420,11 @@ class TestCheckStaleness:
     async def test_no_cache_returns_empty(self, mock_manifest: MagicMock) -> None:
         """Test returns empty dict when no cache exists."""
         with patch(
-            "mcp_gateway.manifest.refresher.load_descriptions_cache",
+            "pmcp.manifest.refresher.load_descriptions_cache",
             return_value=None,
         ):
             with patch(
-                "mcp_gateway.manifest.refresher.load_manifest",
+                "pmcp.manifest.refresher.load_manifest",
                 return_value=mock_manifest,
             ):
                 result = await check_staleness()
@@ -448,15 +448,15 @@ class TestCheckStaleness:
         )
 
         with patch(
-            "mcp_gateway.manifest.refresher.load_descriptions_cache",
+            "pmcp.manifest.refresher.load_descriptions_cache",
             return_value=cache,
         ):
             with patch(
-                "mcp_gateway.manifest.refresher.load_manifest",
+                "pmcp.manifest.refresher.load_manifest",
                 return_value=mock_manifest,
             ):
                 with patch(
-                    "mcp_gateway.manifest.refresher.get_package_version",
+                    "pmcp.manifest.refresher.get_package_version",
                     new_callable=AsyncMock,
                     return_value=("2.0.0", "npm"),
                 ):
@@ -484,15 +484,15 @@ class TestCheckStaleness:
         )
 
         with patch(
-            "mcp_gateway.manifest.refresher.load_descriptions_cache",
+            "pmcp.manifest.refresher.load_descriptions_cache",
             return_value=cache,
         ):
             with patch(
-                "mcp_gateway.manifest.refresher.load_manifest",
+                "pmcp.manifest.refresher.load_manifest",
                 return_value=mock_manifest,
             ):
                 with patch(
-                    "mcp_gateway.manifest.refresher.get_package_version",
+                    "pmcp.manifest.refresher.get_package_version",
                     new_callable=AsyncMock,
                     return_value=("1.0.0", "npm"),
                 ):
@@ -517,15 +517,15 @@ class TestCheckStaleness:
         )
 
         with patch(
-            "mcp_gateway.manifest.refresher.load_descriptions_cache",
+            "pmcp.manifest.refresher.load_descriptions_cache",
             return_value=cache,
         ):
             with patch(
-                "mcp_gateway.manifest.refresher.load_manifest",
+                "pmcp.manifest.refresher.load_manifest",
                 return_value=mock_manifest,
             ):
                 with patch(
-                    "mcp_gateway.manifest.refresher.get_package_version",
+                    "pmcp.manifest.refresher.get_package_version",
                     new_callable=AsyncMock,
                     return_value=(None, "npm"),
                 ):

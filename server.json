@@ -1,16 +1,16 @@
 {
-  "name": "io.github.ViperJuice/gateway-mcp",
-  "description": "A meta-server for minimal Claude Code tool bloat with progressive disclosure and dynamic server provisioning",
-  "version": "1.0.0",
+  "name": "io.github.ViperJuice/pmcp",
+  "description": "Progressive MCP - Minimal context bloat with on-demand tool discovery and dynamic server provisioning",
+  "version": "0.1.0",
   "packages": [
     {
       "registry_type": "pypi",
-      "identifier": "gateway-mcp",
-      "version": "1.0.0"
+      "identifier": "pmcp",
+      "version": "0.1.0"
     }
   ],
-  "keywords": ["gateway", "meta-server", "aggregator", "progressive-disclosure", "dynamic-provisioning"],
-  "repository": "https://github.com/ViperJuice/mcp-gateway",
-  "homepage": "https://github.com/ViperJuice/mcp-gateway",
+  "keywords": ["progressive-disclosure", "meta-server", "aggregator", "dynamic-provisioning", "context-optimization"],
+  "repository": "https://github.com/ViperJuice/pmcp",
+  "homepage": "https://github.com/ViperJuice/pmcp",
   "license": "MIT"
 }

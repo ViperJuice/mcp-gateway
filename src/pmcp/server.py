@@ -22,18 +22,18 @@ from mcp.types import (
 )
 from pydantic import AnyUrl
 
-from mcp_gateway.client.manager import ClientManager
-from mcp_gateway.config.loader import load_configs, manifest_server_to_config
-from mcp_gateway.manifest.loader import load_manifest
-from mcp_gateway.manifest.refresher import (
+from pmcp.client.manager import ClientManager
+from pmcp.config.loader import load_configs, manifest_server_to_config
+from pmcp.manifest.loader import load_manifest
+from pmcp.manifest.refresher import (
     get_cache_path,
     load_descriptions_cache,
     refresh_all,
 )
-from mcp_gateway.policy.policy import PolicyManager
-from mcp_gateway.summary import generate_capability_summary
-from mcp_gateway.tools.handlers import GatewayTools, get_gateway_tool_definitions
-from mcp_gateway.types import DescriptionsCache
+from pmcp.policy.policy import PolicyManager
+from pmcp.summary import generate_capability_summary
+from pmcp.tools.handlers import GatewayTools, get_gateway_tool_definitions
+from pmcp.types import DescriptionsCache
 
 logger = logging.getLogger(__name__)
 

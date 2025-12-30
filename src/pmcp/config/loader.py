@@ -8,11 +8,11 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from mcp_gateway.types import McpConfigFile, McpServerConfig, ResolvedServerConfig
+from pmcp.types import McpConfigFile, McpServerConfig, ResolvedServerConfig
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
-    from mcp_gateway.manifest.loader import ServerConfig as ManifestServerConfig
+    from pmcp.manifest.loader import ServerConfig as ManifestServerConfig
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +150,7 @@ def load_configs(
     # 3. Load custom config (if specified via env or option)
     resolved_custom_path = custom_config_path
     if not resolved_custom_path:
-        env_path = os.environ.get("MCP_GATEWAY_CONFIG")
+        env_path = os.environ.get("PMCP_CONFIG")
         if env_path:
             resolved_custom_path = Path(env_path)
 

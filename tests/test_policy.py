@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 
-from mcp_gateway.policy.policy import PolicyManager
+from pmcp.policy.policy import PolicyManager
 
 
 class TestServerAllowDeny:

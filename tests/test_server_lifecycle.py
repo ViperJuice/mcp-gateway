@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from mcp_gateway.server import GatewayServer
+from pmcp.server import GatewayServer
 
 
 class TestGatewayServerInit:
@@ -115,18 +115,16 @@ class TestGatewayServerIntegration:
     @pytest.mark.asyncio
     async def test_initialize_no_configs(self) -> None:
         """Test initialize with no server configs."""
-        with patch("mcp_gateway.server.load_configs", return_value=[]):
-            with patch("mcp_gateway.server.load_manifest") as mock_manifest:
+        with patch("pmcp.server.load_configs", return_value=[]):
+            with patch("pmcp.server.load_manifest") as mock_manifest:
                 mock_manifest.return_value = MagicMock()
                 mock_manifest.return_value.get_auto_start_servers = MagicMock(
                     return_value=[]
                 )
 
-                with patch(
-                    "mcp_gateway.server.load_descriptions_cache", return_value=None
-                ):
+                with patch("pmcp.server.load_descriptions_cache", return_value=None):
                     with patch(
-                        "mcp_gateway.server.generate_capability_summary"
+                        "pmcp.server.generate_capability_summary"
                     ) as mock_summary:
                         mock_summary.return_value = "No tools available"
 

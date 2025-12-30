@@ -1,13 +1,13 @@
-# Contributing to MCP Gateway
+# Contributing to PMCP
 
-Thank you for your interest in contributing to MCP Gateway!
+Thank you for your interest in contributing to PMCP (Progressive MCP)!
 
 ## Development Setup
 
 ```bash
 # Clone the repository
-git clone https://github.com/ViperJuice/mcp-gateway
-cd mcp-gateway
+git clone https://github.com/ViperJuice/pmcp
+cd pmcp
 
 # Install with uv (recommended)
 uv sync --all-extras
@@ -23,7 +23,7 @@ pip install -e ".[dev]"
 uv run pytest
 
 # Run with coverage
-uv run pytest --cov=mcp_gateway --cov-report=term-missing
+uv run pytest --cov=pmcp --cov-report=term-missing
 
 # Run specific test file
 uv run pytest tests/test_policy.py -v
@@ -34,12 +34,12 @@ uv run pytest tests/test_integration.py -v
 
 ## Adding a Server to the Manifest
 
-The manifest (`src/mcp_gateway/manifest/manifest.yaml`) contains 25+ MCP servers
+The manifest (`src/pmcp/manifest/manifest.yaml`) contains 25+ MCP servers
 that can be provisioned on-demand via `gateway.provision`.
 
 ### Steps to Add a New Server
 
-1. Edit `src/mcp_gateway/manifest/manifest.yaml`
+1. Edit `src/pmcp/manifest/manifest.yaml`
 2. Add an entry under `mcp_servers`:
 
 ```yaml
@@ -85,7 +85,7 @@ uv run ruff format .
 uv run ruff check .
 
 # Check types
-uv run mypy src/mcp_gateway
+uv run mypy src/pmcp
 ```
 
 ## Architecture Overview
@@ -129,7 +129,7 @@ Please include:
 - OS and version
 - Steps to reproduce
 - Expected vs actual behavior
-- Relevant logs (`mcp-gateway logs --level debug`)
+- Relevant logs (`pmcp logs --level debug`)
 
 ## License
 

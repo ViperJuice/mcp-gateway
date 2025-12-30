@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 
-from mcp_gateway.errors import (
+from pmcp.errors import (
     ERROR_MESSAGES,
     ERROR_SUGGESTIONS,
     RETRYABLE_ERRORS,

@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from mcp_gateway.client.manager import (
+from pmcp.client.manager import (
     ClientManager,
     ManagedClient,
     PendingRequest,
@@ -16,7 +16,7 @@ from mcp_gateway.client.manager import (
     _infer_risk_hint,
     _truncate_description,
 )
-from mcp_gateway.types import (
+from pmcp.types import (
     RiskHint,
     ServerStatus,
     ServerStatusEnum,
@@ -200,7 +200,7 @@ class TestCallTool:
         manager = ClientManager()
 
         # Add a tool
-        from mcp_gateway.types import ToolInfo
+        from pmcp.types import ToolInfo
 
         tool = ToolInfo(
             tool_id="test::echo",
@@ -344,7 +344,7 @@ class TestResourcesAndPrompts:
     @pytest.fixture
     def manager_with_resources(self) -> ClientManager:
         """Create a ClientManager with test resources."""
-        from mcp_gateway.types import ResourceInfo
+        from pmcp.types import ResourceInfo
 
         manager = ClientManager()
 
@@ -363,7 +363,7 @@ class TestResourcesAndPrompts:
     @pytest.fixture
     def manager_with_prompts(self) -> ClientManager:
         """Create a ClientManager with test prompts."""
-        from mcp_gateway.types import PromptArgumentInfo, PromptInfo
+        from pmcp.types import PromptArgumentInfo, PromptInfo
 
         manager = ClientManager()
 

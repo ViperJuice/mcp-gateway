@@ -9,13 +9,13 @@ from __future__ import annotations
 import os
 import pytest
 
-from mcp_gateway.config.loader import load_configs, manifest_server_to_config
-from mcp_gateway.client.manager import ClientManager
-from mcp_gateway.manifest.loader import load_manifest
-from mcp_gateway.policy.policy import PolicyManager
-from mcp_gateway.summary import generate_capability_summary
-from mcp_gateway.summary.template_fallback import template_summary
-from mcp_gateway.server import GatewayServer
+from pmcp.config.loader import load_configs, manifest_server_to_config
+from pmcp.client.manager import ClientManager
+from pmcp.manifest.loader import load_manifest
+from pmcp.policy.policy import PolicyManager
+from pmcp.summary import generate_capability_summary
+from pmcp.summary.template_fallback import template_summary
+from pmcp.server import GatewayServer
 
 
 def get_available_servers() -> list:

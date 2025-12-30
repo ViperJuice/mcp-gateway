@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from mcp_gateway.server import GatewayServer
-from mcp_gateway.types import (
+from pmcp.server import GatewayServer
+from pmcp.types import (
     PromptArgumentInfo,
     PromptInfo,
     ResourceInfo,

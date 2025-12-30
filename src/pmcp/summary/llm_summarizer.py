@@ -10,7 +10,7 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from mcp_gateway.types import ToolInfo
+    from pmcp.types import ToolInfo
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +34,8 @@ async def summarize_capabilities(tools: list[ToolInfo]) -> str:
     """
     # Import here to make dependency optional
     try:
-        from mcp_gateway.baml_client import b
-        from mcp_gateway.baml_client.types import ToolDescription
+        from pmcp.baml_client import b
+        from pmcp.baml_client.types import ToolDescription
     except ImportError as e:
         raise ImportError(
             "baml-py not installed. Install with: pip install baml-py"

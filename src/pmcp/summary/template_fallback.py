@@ -10,7 +10,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from mcp_gateway.types import ToolInfo
+    from pmcp.types import ToolInfo
 
 
 # Common capability keywords to extract from tool names/descriptions

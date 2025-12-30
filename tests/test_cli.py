@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from mcp_gateway.cli import parse_args, setup_logging
+from pmcp.cli import parse_args, setup_logging
 
 
 class TestParseArgs:
@@ -185,10 +185,10 @@ class TestMain:
 
     def test_main_loads_dotenv(self) -> None:
         """Test that main loads .env file."""
-        from mcp_gateway.cli import main
+        from pmcp.cli import main
 
-        with patch("mcp_gateway.cli.load_dotenv") as mock_dotenv:
-            with patch("mcp_gateway.cli.parse_args") as mock_parse:
+        with patch("pmcp.cli.load_dotenv") as mock_dotenv:
+            with patch("pmcp.cli.parse_args") as mock_parse:
                 mock_parse.return_value = argparse.Namespace(
                     command=None,
                     project=None,
@@ -208,10 +208,10 @@ class TestMain:
 
     def test_main_handles_keyboard_interrupt(self) -> None:
         """Test that main handles KeyboardInterrupt gracefully."""
-        from mcp_gateway.cli import main
+        from pmcp.cli import main
 
-        with patch("mcp_gateway.cli.load_dotenv"):
-            with patch("mcp_gateway.cli.parse_args") as mock_parse:
+        with patch("pmcp.cli.load_dotenv"):
+            with patch("pmcp.cli.parse_args") as mock_parse:
                 mock_parse.return_value = argparse.Namespace(
                     command=None,
                     project=None,
@@ -230,10 +230,10 @@ class TestMain:
 
     def test_main_exits_on_error(self) -> None:
         """Test that main exits with code 1 on error."""
-        from mcp_gateway.cli import main
+        from pmcp.cli import main
 
-        with patch("mcp_gateway.cli.load_dotenv"):
-            with patch("mcp_gateway.cli.parse_args") as mock_parse:
+        with patch("pmcp.cli.load_dotenv"):
+            with patch("pmcp.cli.parse_args") as mock_parse:
                 mock_parse.return_value = argparse.Namespace(
                     command=None,
                     project=None,
@@ -276,9 +276,9 @@ class TestRunStatus:
         self, status_args: argparse.Namespace, capsys: pytest.CaptureFixture[str]
     ) -> None:
         """Test status output when no servers configured."""
-        from mcp_gateway.cli import run_status
+        from pmcp.cli import run_status
 
-        with patch("mcp_gateway.config.loader.load_configs", return_value=[]):
+        with patch("pmcp.config.loader.load_configs", return_value=[]):
             await run_status(status_args)
 
         captured = capsys.readouterr()
@@ -291,11 +291,11 @@ class TestRunStatus:
         """Test JSON output when no servers configured."""
         import json
 
-        from mcp_gateway.cli import run_status
+        from pmcp.cli import run_status
 
         status_args.json = True
 
-        with patch("mcp_gateway.config.loader.load_configs", return_value=[]):
+        with patch("pmcp.config.loader.load_configs", return_value=[]):
             await run_status(status_args)
 
         captured = capsys.readouterr()
@@ -374,7 +374,7 @@ class TestRunLogs:
         self, capsys: pytest.CaptureFixture[str], tmp_path: Path
     ) -> None:
         """Test logs output when no log file exists."""
-        from mcp_gateway.cli import run_logs
+        from pmcp.cli import run_logs
 
         # Create args
         args = argparse.Namespace(
@@ -386,7 +386,7 @@ class TestRunLogs:
         )
 
         # Patch LOG_FILE to non-existent path
-        with patch("mcp_gateway.cli.LOG_FILE", tmp_path / "nonexistent.log"):
+        with patch("pmcp.cli.LOG_FILE", tmp_path / "nonexistent.log"):
             await run_logs(args)
 
         captured = capsys.readouterr()
@@ -397,7 +397,7 @@ class TestRunLogs:
         self, capsys: pytest.CaptureFixture[str], tmp_path: Path
     ) -> None:
         """Test logs reads existing log file."""
-        from mcp_gateway.cli import run_logs
+        from pmcp.cli import run_logs
 
         # Create test log file
         log_file = tmp_path / "test.log"
@@ -414,7 +414,7 @@ class TestRunLogs:
             server=None,
         )
 
-        with patch("mcp_gateway.cli.LOG_FILE", log_file):
+        with patch("pmcp.cli.LOG_FILE", log_file):
             await run_logs(args)
 
         captured = capsys.readouterr()
@@ -426,7 +426,7 @@ class TestRunLogs:
         self, capsys: pytest.CaptureFixture[str], tmp_path: Path
     ) -> None:
         """Test logs filters by level."""
-        from mcp_gateway.cli import run_logs
+        from pmcp.cli import run_logs
 
         log_file = tmp_path / "test.log"
         log_file.write_text(
@@ -443,7 +443,7 @@ class TestRunLogs:
             server=None,
         )
 
-        with patch("mcp_gateway.cli.LOG_FILE", log_file):
+        with patch("pmcp.cli.LOG_FILE", log_file):
             await run_logs(args)
 
         captured = capsys.readouterr()
@@ -455,7 +455,7 @@ class TestRunLogs:
         self, capsys: pytest.CaptureFixture[str], tmp_path: Path
     ) -> None:
         """Test logs filters by server name."""
-        from mcp_gateway.cli import run_logs
+        from pmcp.cli import run_logs
 
         log_file = tmp_path / "test.log"
         log_file.write_text(
@@ -471,7 +471,7 @@ class TestRunLogs:
             server="github",
         )
 
-        with patch("mcp_gateway.cli.LOG_FILE", log_file):
+        with patch("pmcp.cli.LOG_FILE", log_file):
             await run_logs(args)
 
         captured = capsys.readouterr()
@@ -483,7 +483,7 @@ class TestRunLogs:
         self, capsys: pytest.CaptureFixture[str], tmp_path: Path
     ) -> None:
         """Test logs respects tail limit."""
-        from mcp_gateway.cli import run_logs
+        from pmcp.cli import run_logs
 
         log_file = tmp_path / "test.log"
         lines = [f"[2024-01-01T00:00:{i:02d}] [INFO] Line {i}\n" for i in range(10)]
@@ -497,7 +497,7 @@ class TestRunLogs:
             server=None,
         )
 
-        with patch("mcp_gateway.cli.LOG_FILE", log_file):
+        with patch("pmcp.cli.LOG_FILE", log_file):
             await run_logs(args)
 
         captured = capsys.readouterr()
@@ -516,7 +516,7 @@ class TestRunInit:
         self, capsys: pytest.CaptureFixture[str], tmp_path: Path
     ) -> None:
         """Test init creates .mcp.json file."""
-        from mcp_gateway.cli import run_init
+        from pmcp.cli import run_init
 
         args = argparse.Namespace(
             command="init",
@@ -536,7 +536,7 @@ class TestRunInit:
         self, capsys: pytest.CaptureFixture[str], tmp_path: Path
     ) -> None:
         """Test init aborts if config already exists."""
-        from mcp_gateway.cli import run_init
+        from pmcp.cli import run_init
 
         # Create existing config
         config_file = tmp_path / ".mcp.json"
@@ -558,7 +558,7 @@ class TestRunInit:
         self, capsys: pytest.CaptureFixture[str], tmp_path: Path
     ) -> None:
         """Test init --force overwrites existing config."""
-        from mcp_gateway.cli import run_init
+        from pmcp.cli import run_init
 
         # Create existing config
         config_file = tmp_path / ".mcp.json"
@@ -584,7 +584,7 @@ class TestRunStatusWithData:
     @pytest.fixture
     def mock_server_status(self) -> MagicMock:
         """Create mock server status."""
-        from mcp_gateway.types import ServerStatus, ServerStatusEnum
+        from pmcp.types import ServerStatus, ServerStatusEnum
 
         return ServerStatus(
             name="test-server",
@@ -601,7 +601,7 @@ class TestRunStatusWithData:
         mock_server_status: MagicMock,
     ) -> None:
         """Test status shows server information."""
-        from mcp_gateway.cli import run_status
+        from pmcp.cli import run_status
 
         args = argparse.Namespace(
             command="status",
@@ -615,13 +615,13 @@ class TestRunStatusWithData:
             log_level="warn",
         )
 
-        with patch("mcp_gateway.config.loader.load_configs", return_value=[]):
+        with patch("pmcp.config.loader.load_configs", return_value=[]):
             with patch(
-                "mcp_gateway.client.ClientManager.get_all_server_statuses",
+                "pmcp.client.ClientManager.get_all_server_statuses",
                 return_value=[mock_server_status],
             ):
                 with patch(
-                    "mcp_gateway.client.ClientManager.connect_all",
+                    "pmcp.client.ClientManager.connect_all",
                     return_value=[],
                 ):
                     await run_status(args)
@@ -637,7 +637,7 @@ class TestRunStatusWithData:
         """Test status JSON output includes server data."""
         import json
 
-        from mcp_gateway.cli import run_status
+        from pmcp.cli import run_status
 
         args = argparse.Namespace(
             command="status",
@@ -651,7 +651,7 @@ class TestRunStatusWithData:
             log_level="warn",
         )
 
-        with patch("mcp_gateway.config.loader.load_configs", return_value=[]):
+        with patch("pmcp.config.loader.load_configs", return_value=[]):
             await run_status(args)
 
         captured = capsys.readouterr()

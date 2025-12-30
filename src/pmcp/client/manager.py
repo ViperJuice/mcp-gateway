@@ -13,8 +13,8 @@ from collections import deque
 from dataclasses import dataclass, field
 from typing import Any
 
-from mcp_gateway.config.loader import make_tool_id
-from mcp_gateway.types import (
+from pmcp.config.loader import make_tool_id
+from pmcp.types import (
     PromptArgumentInfo,
     PromptInfo,
     ResolvedServerConfig,

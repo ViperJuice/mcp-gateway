@@ -10,19 +10,19 @@ from typing import Any, Literal, cast
 from dotenv import load_dotenv
 from mcp.types import Tool
 
-from mcp_gateway.client.manager import ClientManager
-from mcp_gateway.config.loader import load_configs, manifest_server_to_config
-from mcp_gateway.errors import ErrorCode, GatewayException, make_error
-from mcp_gateway.manifest.environment import detect_platform, probe_clis
-from mcp_gateway.manifest.installer import (
+from pmcp.client.manager import ClientManager
+from pmcp.config.loader import load_configs, manifest_server_to_config
+from pmcp.errors import ErrorCode, GatewayException, make_error
+from pmcp.manifest.environment import detect_platform, probe_clis
+from pmcp.manifest.installer import (
     MissingApiKeyError,
     get_job_manager,
     InstallError,
 )
-from mcp_gateway.manifest.loader import load_manifest
-from mcp_gateway.manifest.matcher import match_capability
-from mcp_gateway.policy.policy import PolicyManager
-from mcp_gateway.types import (
+from pmcp.manifest.loader import load_manifest
+from pmcp.manifest.matcher import match_capability
+from pmcp.policy.policy import PolicyManager
+from pmcp.types import (
     ArgInfo,
     CancelInput,
     CancelOutput,
@@ -750,8 +750,8 @@ class GatewayTools:
 
         # Try BAML matching
         try:
-            from mcp_gateway.baml_client import b
-            from mcp_gateway.baml_client.types import (
+            from pmcp.baml_client import b
+            from pmcp.baml_client.types import (
                 ManifestCLI,
                 ManifestServer,
                 ManifestSummary,

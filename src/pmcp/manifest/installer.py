@@ -11,13 +11,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
-from mcp_gateway.manifest.environment import Platform
-from mcp_gateway.manifest.loader import ServerConfig
+from pmcp.manifest.environment import Platform
+from pmcp.manifest.loader import ServerConfig
 
 logger = logging.getLogger(__name__)
 
 # Heartbeat timeout - kill if no output for this long
 HEARTBEAT_TIMEOUT = 120  # seconds
+
+# Time to wait before assuming uvx server is ready (they don't output startup messages)
+UVX_STARTUP_SECONDS = 3
 
 
 class InstallError(Exception):
@@ -51,6 +54,7 @@ class InstallJob:
     started_at: float = field(default_factory=time.time)
     process: asyncio.subprocess.Process | None = None
     error: str | None = None
+    command: str = ""  # The command used (e.g., "uvx", "npx")
     _monitor_task: asyncio.Task | None = field(default=None, repr=False)
 
 
@@ -109,6 +113,7 @@ class JobManager:
             id=job_id,
             server_name=server_config.name,
             status="pending",
+            command=install_cmd[0] if install_cmd else "",
         )
         self._jobs[job_id] = job
 
@@ -193,6 +198,10 @@ class JobManager:
             job.error = "No process to monitor"
             return
 
+        # Detect uvx-based servers (they don't output startup messages)
+        is_uvx = "uvx" in job.command.lower()
+        start_time = time.time()
+
         # Create tasks to read from both streams
         async def read_line(
             stream: asyncio.StreamReader, name: str
@@ -231,27 +240,52 @@ class JobManager:
                     continue
 
                 try:
+                    # Use shorter timeout for uvx to check readiness more frequently
+                    poll_timeout = 1.0 if is_uvx else HEARTBEAT_TIMEOUT
+
                     done, pending = await asyncio.wait(
                         pending_tasks,
-                        timeout=HEARTBEAT_TIMEOUT,
+                        timeout=poll_timeout,
                         return_when=asyncio.FIRST_COMPLETED,
                     )
 
                     if not done:
                         # Timeout - no output from either stream
-                        elapsed = time.time() - job.last_heartbeat
-                        logger.warning(
-                            f"Install job {job.id} stalled (no output for {elapsed:.0f}s), killing"
-                        )
-                        # Cancel pending tasks
-                        for task in pending:
-                            task.cancel()
-                        await self._safe_terminate_process(process, job.id, force=True)
-                        job.status = "timeout"
-                        job.error = (
-                            f"Installation stalled (no output for {HEARTBEAT_TIMEOUT}s)"
-                        )
-                        return
+                        elapsed_since_heartbeat = time.time() - job.last_heartbeat
+                        elapsed_since_start = time.time() - start_time
+
+                        # For uvx servers: ready after process runs stable for UVX_STARTUP_SECONDS
+                        if is_uvx and elapsed_since_start >= UVX_STARTUP_SECONDS:
+                            if process.returncode is None:
+                                logger.info(
+                                    f"Install {job.id}: uvx server ready (process stable for {elapsed_since_start:.1f}s)"
+                                )
+                                job.status = "server_ready"
+                                job.progress = 100
+                                # Cancel pending tasks
+                                for task in pending:
+                                    task.cancel()
+                                return
+                            # Process exited - will be handled below
+
+                        # For uvx, keep polling until UVX_STARTUP_SECONDS
+                        if is_uvx and elapsed_since_start < UVX_STARTUP_SECONDS:
+                            continue
+
+                        # Regular heartbeat timeout check
+                        if elapsed_since_heartbeat >= HEARTBEAT_TIMEOUT:
+                            logger.warning(
+                                f"Install job {job.id} stalled (no output for {elapsed_since_heartbeat:.0f}s), killing"
+                            )
+                            # Cancel pending tasks
+                            for task in pending:
+                                task.cancel()
+                            await self._safe_terminate_process(
+                                process, job.id, force=True
+                            )
+                            job.status = "timeout"
+                            job.error = f"Installation stalled (no output for {HEARTBEAT_TIMEOUT}s)"
+                            return
 
                     # Process completed tasks
                     for task in done:

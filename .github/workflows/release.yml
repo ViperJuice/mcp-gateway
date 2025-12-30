@@ -23,7 +23,7 @@ jobs:
         run: uv sync --all-extras
 
       - name: Run tests with coverage
-        run: uv run pytest tests/ -v --cov=mcp_gateway --cov-fail-under=60
+        run: uv run pytest tests/ -v --cov=pmcp --cov-fail-under=60
 
       - name: Build package
         run: uv build
@@ -51,4 +51,4 @@ jobs:
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         # Uses trusted publishing - no token needed
-        # Configure at: https://pypi.org/manage/project/mcp-gateway/settings/publishing/
+        # Configure at: https://pypi.org/manage/project/pmcp/settings/publishing/

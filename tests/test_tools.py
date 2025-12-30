@@ -6,10 +6,10 @@ from typing import Any
 
 import pytest
 
-from mcp_gateway.errors import GatewayException
-from mcp_gateway.policy.policy import PolicyManager
-from mcp_gateway.tools.handlers import GatewayTools
-from mcp_gateway.types import (
+from pmcp.errors import GatewayException
+from pmcp.policy.policy import PolicyManager
+from pmcp.tools.handlers import GatewayTools
+from pmcp.types import (
     RiskHint,
     ToolInfo,
 )

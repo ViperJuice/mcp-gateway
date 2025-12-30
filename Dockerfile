@@ -22,17 +22,17 @@ WORKDIR /app
 
 # Copy installed packages from builder
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
-COPY --from=builder /usr/local/bin/mcp-gateway /usr/local/bin/
+COPY --from=builder /usr/local/bin/pmcp /usr/local/bin/
 
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash appuser
 USER appuser
 
 # Set environment defaults
-ENV MCP_GATEWAY_LOG_LEVEL=info
+ENV PMCP_LOG_LEVEL=info
 ENV PYTHONUNBUFFERED=1
 
 # Health check placeholder (MCP uses stdio, not HTTP)
 # HEALTHCHECK --interval=30s --timeout=3s CMD echo "ok"
 
-ENTRYPOINT ["mcp-gateway"]
+ENTRYPOINT ["pmcp"]

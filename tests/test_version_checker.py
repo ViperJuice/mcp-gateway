@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from mcp_gateway.manifest.version_checker import (
+from pmcp.manifest.version_checker import (
     _version_cache,
     clear_version_cache,
     detect_package_type,
@@ -393,7 +393,7 @@ class TestGetPackageVersion:
     async def test_npm_package(self) -> None:
         """Test npm package version lookup."""
         with patch(
-            "mcp_gateway.manifest.version_checker.get_npm_version",
+            "pmcp.manifest.version_checker.get_npm_version",
             new_callable=AsyncMock,
             return_value="1.0.0",
         ):
@@ -405,7 +405,7 @@ class TestGetPackageVersion:
     async def test_pypi_package(self) -> None:
         """Test PyPI package version lookup."""
         with patch(
-            "mcp_gateway.manifest.version_checker.get_pypi_version",
+            "pmcp.manifest.version_checker.get_pypi_version",
             new_callable=AsyncMock,
             return_value="2.0.0",
         ):
@@ -424,7 +424,7 @@ class TestGetPackageVersion:
     async def test_npm_lookup_failure(self) -> None:
         """Test handling of npm lookup failure."""
         with patch(
-            "mcp_gateway.manifest.version_checker.get_npm_version",
+            "pmcp.manifest.version_checker.get_npm_version",
             new_callable=AsyncMock,
             return_value=None,
         ):

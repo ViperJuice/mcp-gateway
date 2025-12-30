@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass
 from typing import Literal
 
-from mcp_gateway.manifest.loader import CLIAlternative, Manifest, ServerConfig
+from pmcp.manifest.loader import CLIAlternative, Manifest, ServerConfig
 
 logger = logging.getLogger(__name__)
 
@@ -82,8 +82,8 @@ async def _llm_match(
     running_servers: list[str] | None = None,
 ) -> MatchResult:
     """Use BAML/Groq for semantic matching."""
-    from mcp_gateway.baml_client import b
-    from mcp_gateway.baml_client.types import (
+    from pmcp.baml_client import b
+    from pmcp.baml_client.types import (
         ManifestCLI,
         ManifestServer,
         ManifestSummary,

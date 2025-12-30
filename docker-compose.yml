@@ -1,5 +1,5 @@
 services:
-  mcp-gateway:
+  pmcp:
     build:
       context: .
       dockerfile: Dockerfile
@@ -11,14 +11,14 @@ services:
       # Environment variables for API keys (optional)
       - ./.env:/app/.env:ro
       # Cache directory for capability summaries (optional, for persistence)
-      - mcp-gateway-cache:/app/.mcp-gateway
+      - pmcp-cache:/app/.pmcp
 
     environment:
-      - MCP_GATEWAY_LOG_LEVEL=info
+      - PMCP_LOG_LEVEL=info
 
     # MCP uses stdio, so we need interactive mode for testing
     stdin_open: true
     tty: true
 
 volumes:
-  mcp-gateway-cache:
+  pmcp-cache:

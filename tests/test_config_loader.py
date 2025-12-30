@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 
-from mcp_gateway.config.loader import (
+from pmcp.config.loader import (
     load_configs,
     make_tool_id,
     parse_tool_id,

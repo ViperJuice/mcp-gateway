@@ -9,8 +9,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from mcp_gateway.policy.policy import PolicyManager
-from mcp_gateway.types import (
+from pmcp.policy.policy import PolicyManager
+from pmcp.types import (
     McpServerConfig,
     ResolvedServerConfig,
     RiskHint,

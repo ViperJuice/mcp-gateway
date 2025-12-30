@@ -11,7 +11,7 @@ from typing import Any
 
 import yaml
 
-from mcp_gateway.types import GatewayPolicy
+from pmcp.types import GatewayPolicy
 
 logger = logging.getLogger(__name__)
 

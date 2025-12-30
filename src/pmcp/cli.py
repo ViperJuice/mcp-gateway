@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""MCP Gateway CLI."""
+"""PMCP CLI."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 
 from logging.handlers import RotatingFileHandler
 
-LOG_DIR = Path(".mcp-gateway/logs")
+LOG_DIR = Path(".pmcp/logs")
 LOG_FILE = LOG_DIR / "gateway.log"
 
 
@@ -56,7 +56,7 @@ def setup_logging(level: str, log_to_file: bool = True) -> None:
 def parse_args() -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="MCP Gateway - A meta-server for minimal Claude Code tool bloat",
+        description="PMCP - Progressive MCP: Minimal context bloat with on-demand tool discovery",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
@@ -127,8 +127,8 @@ def parse_args() -> argparse.Namespace:
     refresh_parser.add_argument(
         "--cache-dir",
         type=Path,
-        default=Path(".mcp-gateway"),
-        help="Cache directory (default: .mcp-gateway)",
+        default=Path(".pmcp"),
+        help="Cache directory (default: .pmcp)",
     )
     refresh_parser.add_argument(
         "-l",
@@ -225,7 +225,7 @@ def parse_args() -> argparse.Namespace:
     # Init command
     init_parser = subparsers.add_parser(
         "init",
-        help="Initialize MCP Gateway configuration",
+        help="Initialize PMCP configuration",
         description="Create a .mcp.json configuration file interactively.",
     )
     init_parser.add_argument(
@@ -246,7 +246,7 @@ def parse_args() -> argparse.Namespace:
 
 async def run_refresh(args: argparse.Namespace) -> None:
     """Run the refresh command."""
-    from mcp_gateway.manifest.refresher import (
+    from pmcp.manifest.refresher import (
         check_staleness,
         get_cache_path,
         refresh_all,
@@ -305,10 +305,10 @@ async def run_status(args: argparse.Namespace) -> None:
     import time
     from datetime import datetime
 
-    from mcp_gateway.client.manager import ClientManager
-    from mcp_gateway.config.loader import load_configs
-    from mcp_gateway.policy.policy import PolicyManager
-    from mcp_gateway.types import ServerStatusEnum
+    from pmcp.client.manager import ClientManager
+    from pmcp.config.loader import load_configs
+    from pmcp.policy.policy import PolicyManager
+    from pmcp.types import ServerStatusEnum
 
     setup_logging(args.log_level)
     logger = logging.getLogger(__name__)
@@ -391,7 +391,7 @@ async def run_status(args: argparse.Namespace) -> None:
             online = sum(1 for s in statuses if s.status == ServerStatusEnum.ONLINE)
             offline = len(statuses) - online
 
-            print("MCP Gateway Status")
+            print("PMCP Status")
             print("==================\n")
 
             if statuses:
@@ -499,10 +499,10 @@ async def run_logs(args: argparse.Namespace) -> None:
 
 
 async def run_init(args: argparse.Namespace) -> None:
-    """Initialize MCP Gateway configuration."""
+    """Initialize PMCP configuration."""
     import json
 
-    from mcp_gateway.manifest.loader import load_manifest
+    from pmcp.manifest.loader import load_manifest
 
     project_dir = args.project or Path.cwd()
     config_path = project_dir / ".mcp.json"
@@ -513,7 +513,7 @@ async def run_init(args: argparse.Namespace) -> None:
         print("Use --force to overwrite.")
         return
 
-    print("MCP Gateway Configuration\n")
+    print("PMCP Configuration\n")
 
     # Load manifest to get available servers
     try:
@@ -587,15 +587,15 @@ async def run_init(args: argparse.Namespace) -> None:
 
 async def run_server(args: argparse.Namespace) -> None:
     """Run the MCP gateway server."""
-    from mcp_gateway.server import GatewayServer
+    from pmcp.server import GatewayServer
 
     # Check environment variables
-    if not args.config and os.environ.get("MCP_GATEWAY_CONFIG"):
-        args.config = Path(os.environ["MCP_GATEWAY_CONFIG"])
-    if not args.policy and os.environ.get("MCP_GATEWAY_POLICY"):
-        args.policy = Path(os.environ["MCP_GATEWAY_POLICY"])
-    if os.environ.get("MCP_GATEWAY_LOG_LEVEL"):
-        args.log_level = os.environ["MCP_GATEWAY_LOG_LEVEL"]
+    if not args.config and os.environ.get("PMCP_CONFIG"):
+        args.config = Path(os.environ["PMCP_CONFIG"])
+    if not args.policy and os.environ.get("PMCP_POLICY"):
+        args.policy = Path(os.environ["PMCP_POLICY"])
+    if os.environ.get("PMCP_LOG_LEVEL"):
+        args.log_level = os.environ["PMCP_LOG_LEVEL"]
 
     # Determine log level
     if args.debug:
@@ -608,7 +608,7 @@ async def run_server(args: argparse.Namespace) -> None:
     setup_logging(log_level)
     logger = logging.getLogger(__name__)
 
-    logger.info("Starting MCP Gateway...")
+    logger.info("Starting PMCP...")
 
     server = GatewayServer(
         project_root=args.project,

@@ -8,10 +8,10 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from mcp_gateway.summary.template_fallback import template_summary
+from pmcp.summary.template_fallback import template_summary
 
 if TYPE_CHECKING:
-    from mcp_gateway.types import DescriptionsCache, ToolInfo
+    from pmcp.types import DescriptionsCache, ToolInfo
 
 logger = logging.getLogger(__name__)
 
@@ -90,7 +90,7 @@ async def generate_capability_summary(
     # 2. Try LLM summarization
     if use_llm:
         try:
-            from mcp_gateway.summary.llm_summarizer import summarize_capabilities
+            from pmcp.summary.llm_summarizer import summarize_capabilities
 
             logger.info("Attempting LLM-based capability summary...")
             summary = await summarize_capabilities(tools)
