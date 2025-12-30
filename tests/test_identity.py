@@ -140,7 +140,9 @@ class TestFilterSelfReferences:
                 args=["-y", "@modelcontextprotocol/server-filesystem", "/tmp"],
             ),
             MockServerConfig(
-                name="memory", command="npx", args=["-y", "@anthropics/mcp-server-memory"]
+                name="memory",
+                command="npx",
+                args=["-y", "@anthropics/mcp-server-memory"],
             ),
         ]
         filtered = filter_self_references(configs)

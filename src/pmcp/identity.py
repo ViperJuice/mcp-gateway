@@ -49,13 +49,13 @@ def is_self_reference(config: ResolvedServerConfig) -> bool:
         True if this config would spawn another gateway instance
     """
     # Handle both nested config (ResolvedServerConfig) and flat config (mock/test)
-    if hasattr(config, 'config') and config.config is not None:
+    if hasattr(config, "config") and config.config is not None:
         command = config.config.command.lower()
         args_lower = [a.lower() for a in config.config.args]
     else:
         # Fallback for flat config objects (e.g., in tests)
-        command = getattr(config, 'command', '').lower()
-        args_lower = [a.lower() for a in getattr(config, 'args', [])]
+        command = getattr(config, "command", "").lower()
+        args_lower = [a.lower() for a in getattr(config, "args", [])]
 
     # Direct gateway command (e.g., command: pmcp)
     command_base = Path(command).name
@@ -99,12 +99,12 @@ def filter_self_references(
     for config in configs:
         if is_self_reference(config):
             # Get command info for logging
-            if hasattr(config, 'config') and config.config is not None:
+            if hasattr(config, "config") and config.config is not None:
                 cmd = config.config.command
                 args = config.config.args
             else:
-                cmd = getattr(config, 'command', '')
-                args = getattr(config, 'args', [])
+                cmd = getattr(config, "command", "")
+                args = getattr(config, "args", [])
             logger.warning(
                 f"Excluding server '{config.name}' to prevent recursive spawning "
                 f"(command: {cmd} {' '.join(args)})"

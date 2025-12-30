@@ -24,7 +24,11 @@ from pydantic import AnyUrl
 
 from pmcp.client.manager import ClientManager
 from pmcp.config.loader import load_configs, manifest_server_to_config
-from pmcp.identity import filter_self_references, acquire_singleton_lock, release_singleton_lock
+from pmcp.identity import (
+    filter_self_references,
+    acquire_singleton_lock,
+    release_singleton_lock,
+)
 from pmcp.manifest.loader import load_manifest
 from pmcp.manifest.refresher import (
     get_cache_path,
