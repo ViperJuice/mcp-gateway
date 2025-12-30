@@ -1,6 +1,6 @@
 # MCP Gateway
 
-<!-- mcp-name: io.github.ViperJuice/gateway-mcp -->
+<!-- mcp-name: io.github.ViperJuice/pmcp -->
 
 [![PyPI version](https://badge.fury.io/py/pmcp.svg)](https://pypi.org/project/pmcp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)

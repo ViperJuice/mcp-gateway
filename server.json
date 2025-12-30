@@ -1,5 +1,5 @@
 {
-  "name": "io.github.ViperJuice/gateway-mcp",
+  "name": "io.github.ViperJuice/pmcp",
   "description": "A meta-server for minimal Claude Code tool bloat with progressive disclosure and dynamic server provisioning",
   "version": "1.0.0",
   "packages": [
