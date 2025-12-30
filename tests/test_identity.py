@@ -1,7 +1,8 @@
 """Tests for gateway identity detection to prevent recursive spawning."""
 
-import pytest
 from dataclasses import dataclass
+
+from pmcp.identity import is_self_reference, filter_self_references
 
 
 @dataclass
@@ -11,10 +12,6 @@ class MockServerConfig:
     name: str
     command: str
     args: list[str]
-
-
-# Import after defining mock to avoid circular import issues
-from pmcp.identity import is_self_reference, filter_self_references
 
 
 class TestIsSelfReference:
