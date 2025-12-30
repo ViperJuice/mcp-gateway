@@ -2,7 +2,7 @@
 
 <!-- mcp-name: io.github.ViperJuice/gateway-mcp -->
 
-[![PyPI version](https://badge.fury.io/py/gateway-mcp.svg)](https://pypi.org/project/gateway-mcp/)
+[![PyPI version](https://badge.fury.io/py/pmcp.svg)](https://pypi.org/project/pmcp/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 A meta-server for minimal Claude Code tool bloat with progressive disclosure and dynamic server provisioning.
@@ -62,17 +62,17 @@ The gateway discovers and manages all other servers.
 
 ```bash
 # With pip
-pip install gateway-mcp
+pip install pmcp
 
 # With uv (recommended)
-uv pip install gateway-mcp
+uv pip install pmcp
 
 # Or run directly with uvx
-uvx gateway-mcp
+uvx pmcp
 
 # With LLM capability matching (optional)
-pip install gateway-mcp[llm]
-uv pip install gateway-mcp[llm]
+pip install pmcp[llm]
+uv pip install pmcp[llm]
 ```
 
 ### Configure Claude Code
@@ -414,7 +414,7 @@ Run the gateway in a container:
 docker run -it --rm \
   -v ~/.mcp.json:/home/appuser/.mcp.json:ro \
   -v ~/.env:/app/.env:ro \
-  ghcr.io/viperjuice/mcp-gateway:latest
+  ghcr.io/viperjuice/pmcp:latest
 
 # Using Docker Compose
 docker-compose up -d
@@ -423,8 +423,8 @@ docker-compose up -d
 Build locally:
 
 ```bash
-docker build -t mcp-gateway .
-docker run -it --rm mcp-gateway --help
+docker build -t pmcp .
+docker run -it --rm pmcp --help
 ```
 
 ## Health Monitoring
@@ -491,8 +491,8 @@ prompts/get { name: "server::prompt-name" }
 
 ```bash
 # Clone the repo
-git clone https://github.com/ViperJuice/mcp-gateway
-cd mcp-gateway
+git clone https://github.com/ViperJuice/pmcp
+cd pmcp
 
 # Install with uv (recommended)
 uv sync --all-extras
@@ -523,7 +523,7 @@ uv run pytest tests/test_policy.py -v
 ### Project Structure
 
 ```
-mcp-gateway/
+pmcp/
 ├── src/mcp_gateway/
 │   ├── __init__.py
 │   ├── __main__.py           # python -m mcp_gateway entry
