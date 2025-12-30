@@ -23,11 +23,11 @@ When Claude Code connects to multiple MCP servers (GitHub, Jira, databases, etc.
 
 ## Where to get it:
 
-**PyPI**: https://pypi.org/project/gateway-mcp/
+**PyPI**: https://pypi.org/project/pmcp/
 ```bash
-pip install gateway-mcp
+pip install pmcp
 # or
-uvx gateway-mcp
+uvx pmcp
 ```
 
 **GitHub**: https://github.com/ViperJuice/pmcp
