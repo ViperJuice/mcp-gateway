@@ -260,6 +260,57 @@ The manifest includes 25+ servers that can be provisioned on-demand:
 
 See `.env.example` for all supported environment variables.
 
+## Code Execution Guidance
+
+PMCP includes built-in guidance to encourage models to use code execution patterns, reducing context bloat and improving workflow efficiency.
+
+### Guidance Layers
+
+**L0 (MCP Instructions)**: Brief philosophy in server instructions (~30 tokens)
+- "Write code to orchestrate tools - use loops, filters, conditionals"
+
+**L1 (Code Hints)**: Ultra-terse hints in search results (~8-12 tokens/card)
+- Single-word hints: "loop", "filter", "try/catch", "poll"
+
+**L2 (Code Snippets)**: Minimal examples in describe output (~40-80 tokens, opt-in)
+- 3-4 line code examples showing practical usage
+
+**L3 (Methodology Resource)**: Full guide (lazy-loaded, 0 tokens)
+- Accessible via `pmcp://guidance/code-execution` resource
+
+### Guidance Configuration
+
+Create `~/.claude/gateway-guidance.yaml`:
+
+```yaml
+guidance:
+  level: "minimal"  # Options: "off", "minimal", "standard"
+
+  layers:
+    mcp_instructions: true   # L0 philosophy
+    code_hints: true         # L1 hints
+    code_snippets: false     # L2 examples (default: off)
+    methodology_resource: true  # L3 guide
+```
+
+**Levels**:
+- `minimal` (default): L0 + L1 (~200 tokens overhead)
+- `standard`: L0 + L1 + L2 (~320 tokens overhead)
+- `off`: No guidance
+
+### View Guidance Status
+
+```bash
+pmcp guidance                 # Show configuration
+pmcp guidance --show-budget  # Show token estimates
+```
+
+### Token Budget
+
+- **Minimal mode**: ~200 tokens typical workflow (L0 + search)
+- **Standard mode**: ~320 tokens (L0 + search + 1 describe)
+- **80% reduction** vs loading all tool schemas upfront!
+
 ## Configuration
 
 ### Config Discovery

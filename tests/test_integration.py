@@ -144,7 +144,8 @@ class TestSummaryGeneration:
 
             print(f"\nTemplate Summary:\n{summary}")
 
-            assert "MCP Gateway capabilities:" in summary
+            # Check for MCP Gateway header (format changed with L0 guidance)
+            assert "MCP Gateway:" in summary
             assert "gateway.catalog_search" in summary
 
         finally:

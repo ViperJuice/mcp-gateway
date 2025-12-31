@@ -33,7 +33,8 @@ function SummarizeCapabilities(tools: ToolDescription[]) -> CapabilitySummary {
     Each category should reference the server that provides it.
     Keep summaries concise (3-5 words).
 
-    The usage_hint should always be: "Use gateway.catalog_search to explore tools."
+    IMPORTANT: The usage_hint should encourage code execution patterns:
+    "Write code to orchestrate tools - use loops, filters, conditionals. Search → describe → invoke via code execution."
 
     {{ ctx.output_format }}
   "#

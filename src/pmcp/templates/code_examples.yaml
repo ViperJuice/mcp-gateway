@@ -1,0 +1,137 @@
+# Code snippet templates for PMCP tools
+# These minimal examples (3-4 lines max) show how to use tools in code
+# Only included when guidance.code_snippets is enabled
+
+# Playwright examples
+"playwright::browser_navigate":
+  snippet: |
+    # Navigate to multiple URLs
+    for url in urls:
+        mcp.call_tool("gateway.invoke", {"tool_id": "playwright::browser_navigate", "arguments": {"url": url}})
+
+"playwright::browser_screenshot":
+  snippet: |
+    # Capture screenshots in a loop
+    for i, url in enumerate(urls):
+        mcp.call_tool("gateway.invoke", {"tool_id": "playwright::browser_screenshot", "arguments": {"path": f"shot_{i}.png"}})
+
+"playwright::browser_click":
+  snippet: |
+    # Click elements
+    elements = [".button", "#submit", "a.link"]
+    for selector in elements:
+        mcp.call_tool("gateway.invoke", {"tool_id": "playwright::browser_click", "arguments": {"selector": selector}})
+
+# Filesystem examples
+"filesystem::list_files":
+  snippet: |
+    # Filter files locally
+    files = mcp.call_tool("gateway.invoke", {"tool_id": "filesystem::list_files", "arguments": {"path": "./"}})
+    py_files = [f for f in files if f.endswith(".py")]
+
+"filesystem::read_file":
+  snippet: |
+    # Read with error handling
+    try:
+        content = mcp.call_tool("gateway.invoke", {"tool_id": "filesystem::read_file", "arguments": {"path": "file.txt"}})
+    except Exception as e:
+        print(f"Read failed: {e}")
+
+"filesystem::write_file":
+  snippet: |
+    # Write multiple files
+    for name, data in file_data.items():
+        mcp.call_tool("gateway.invoke", {"tool_id": "filesystem::write_file", "arguments": {"path": name, "content": data}})
+
+# GitHub examples
+"github::listIssues":
+  snippet: |
+    # Filter issues locally
+    issues = mcp.call_tool("gateway.invoke", {"tool_id": "github::listIssues", "arguments": {"repo": "owner/repo"}})
+    open_bugs = [i for i in issues if i["state"] == "open" and "bug" in i["labels"]]
+
+"github::createIssue":
+  snippet: |
+    # Create with error handling
+    try:
+        result = mcp.call_tool("gateway.invoke", {"tool_id": "github::createIssue", "arguments": {"title": "Bug", "body": "Description"}})
+    except Exception as e:
+        print(f"Failed: {e}")
+
+# Database examples
+"postgres::query":
+  snippet: |
+    # Query and filter
+    rows = mcp.call_tool("gateway.invoke", {"tool_id": "postgres::query", "arguments": {"sql": "SELECT * FROM users"}})
+    active = [r for r in rows if r["status"] == "active"]
+
+"sqlite::query":
+  snippet: |
+    # Query with filter
+    data = mcp.call_tool("gateway.invoke", {"tool_id": "sqlite::query", "arguments": {"query": "SELECT * FROM items"}})
+    recent = [d for d in data if d["created"] > cutoff_date]
+
+# Browser automation
+"puppeteer::navigate":
+  snippet: |
+    # Navigate to pages
+    for page_url in page_urls:
+        mcp.call_tool("gateway.invoke", {"tool_id": "puppeteer::navigate", "arguments": {"url": page_url}})
+
+"puppeteer::screenshot":
+  snippet: |
+    # Capture screenshots
+    for i, url in enumerate(urls):
+        mcp.call_tool("gateway.invoke", {"tool_id": "puppeteer::screenshot", "arguments": {"filename": f"page_{i}.png"}})
+
+# Gateway tools
+"gateway::provision":
+  snippet: |
+    # Provision with error handling
+    try:
+        mcp.call_tool("gateway.provision", {"server_name": "github"})
+    except Exception as e:
+        print(f"Provision failed: {e}")
+
+"gateway::provision_status":
+  snippet: |
+    # Poll until ready
+    while True:
+        status = mcp.call_tool("gateway.provision_status", {"server_name": "github"})
+        if status["state"] in ["ready", "failed"]: break
+
+"gateway::catalog_search":
+  snippet: |
+    # Search and filter
+    results = mcp.call_tool("gateway.catalog_search", {"query": "browser"})
+    online_tools = [r for r in results if r["availability"] == "online"]
+
+"gateway::describe":
+  snippet: |
+    # Check before invoke
+    schema = mcp.call_tool("gateway.describe", {"tool_id": "server::tool"})
+    if schema["risk_hint"] == "HIGH":
+        print("Warning: high-risk tool")
+
+"gateway::invoke":
+  snippet: |
+    # Invoke with error handling
+    try:
+        result = mcp.call_tool("gateway.invoke", {"tool_id": "server::tool", "arguments": args})
+    except Exception as e:
+        print(f"Invocation failed: {e}")
+
+# Context7 examples
+"context7::get-library-docs":
+  snippet: |
+    # Fetch docs for libraries
+    libraries = ["react/19.0.0", "vue/3.4.0"]
+    for lib in libraries:
+        docs = mcp.call_tool("gateway.invoke", {"tool_id": "context7::get-library-docs", "arguments": {"libraryId": f"/npm/{lib}"}})
+
+# Generic fallback template (used when no specific template exists)
+_generic_fallback:
+  snippet: |
+    # Example usage
+    result = mcp.call_tool("gateway.invoke", {"tool_id": "{tool_id}", "arguments": {args}})
+    print(result)

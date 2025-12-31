@@ -241,6 +241,18 @@ def parse_args() -> argparse.Namespace:
         help="Overwrite existing configuration",
     )
 
+    # Guidance command
+    guidance_parser = subparsers.add_parser(
+        "guidance",
+        help="Show code execution guidance configuration",
+        description="Display current guidance settings and token budget.",
+    )
+    guidance_parser.add_argument(
+        "--show-budget",
+        action="store_true",
+        help="Show estimated token budget for current config",
+    )
+
     return parser.parse_args()
 
 
@@ -658,6 +670,44 @@ async def run_server(args: argparse.Namespace) -> None:
         raise
 
 
+def run_guidance(args: argparse.Namespace) -> None:
+    """Show guidance configuration status."""
+    from pmcp.config.guidance import load_guidance_config
+
+    setup_logging(args.log_level)
+
+    # Load guidance config
+    config = load_guidance_config()
+
+    print("Code Execution Guidance Configuration")
+    print("=" * 50)
+    print(f"Level: {config.level}")
+    print(f"Config file: ~/.claude/gateway-guidance.yaml")
+    print()
+    print("Layers:")
+    print(f"  L0 MCP Instructions: {'✓' if config.include_mcp_instructions else '✗'}")
+    print(f"  L1 Code Hints: {'✓' if config.include_code_hints else '✗'}")
+    print(f"  L2 Code Snippets: {'✓' if config.include_code_snippets else '✗'}")
+    print(f"  L3 Methodology Resource: {'✓' if config.include_methodology_resource else '✗'}")
+    print()
+
+    if args.show_budget:
+        print("Token Budget (Estimated):")
+        print("-" * 50)
+        minimal = config.estimated_token_cost(num_search_results=15, num_describes=0)
+        standard = config.estimated_token_cost(num_search_results=15, num_describes=1)
+        heavy = config.estimated_token_cost(num_search_results=20, num_describes=2)
+
+        print(f"  Minimal workflow (L0 + search): ~{minimal} tokens")
+        print(f"  Standard workflow (+ 1 describe): ~{standard} tokens")
+        print(f"  Heavy workflow (+ 2 describes): ~{heavy} tokens")
+        print()
+
+    print("To change configuration:")
+    print("  Edit ~/.claude/gateway-guidance.yaml")
+    print("  Or set level: off | minimal | standard")
+
+
 async def async_main(args: argparse.Namespace) -> None:
     """Async main entry point - dispatch to appropriate command."""
     if args.command == "refresh":
@@ -668,6 +718,8 @@ async def async_main(args: argparse.Namespace) -> None:
         await run_logs(args)
     elif args.command == "init":
         await run_init(args)
+    elif args.command == "guidance":
+        run_guidance(args)  # Synchronous command
     else:
         # Default: run server
         await run_server(args)

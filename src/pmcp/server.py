@@ -23,6 +23,7 @@ from mcp.types import (
 from pydantic import AnyUrl
 
 from pmcp.client.manager import ClientManager
+from pmcp.config.guidance import GuidanceConfig, load_guidance_config
 from pmcp.config.loader import load_configs, manifest_server_to_config
 from pmcp.identity import (
     filter_self_references,
@@ -52,6 +53,7 @@ class GatewayServer:
         custom_config_path: Path | None = None,
         policy_path: Path | None = None,
         cache_dir: Path | None = None,
+        guidance_config_path: Path | None = None,
     ) -> None:
         self._project_root = project_root
         self._custom_config_path = custom_config_path
@@ -59,6 +61,10 @@ class GatewayServer:
 
         # Initialize policy manager
         self._policy_manager = PolicyManager(policy_path)
+
+        # Initialize guidance config
+        self._guidance_config: GuidanceConfig = load_guidance_config(guidance_config_path)
+        logger.info(f"Guidance level: {self._guidance_config.level}")
 
         # Initialize client manager
         self._client_manager = ClientManager(
@@ -71,6 +77,7 @@ class GatewayServer:
             policy_manager=self._policy_manager,
             project_root=project_root,
             custom_config_path=custom_config_path,
+            guidance_config=self._guidance_config,
         )
 
         # Server will be created after initialization with capability summary
@@ -139,7 +146,7 @@ class GatewayServer:
                     )
                 ]
 
-        # Resource handlers - proxy from downstream servers
+        # Resource handlers - proxy from downstream servers + L3 guidance
         @self._server.list_resources()
         async def list_resources() -> list[Resource]:
             resources = self._client_manager.get_all_resources()
@@ -149,7 +156,7 @@ class GatewayServer:
                 for r in resources
                 if self._policy_manager.is_resource_allowed(r.resource_id)
             ]
-            return [
+            resource_list = [
                 Resource(
                     uri=AnyUrl(r.uri),
                     name=r.name or r.uri,
@@ -159,10 +166,48 @@ class GatewayServer:
                 for r in allowed_resources
             ]
 
+            # Add L3 guidance resource if enabled
+            if self._guidance_config.include_methodology_resource:
+                resource_list.append(
+                    Resource(
+                        uri=AnyUrl("pmcp://guidance/code-execution"),
+                        name="Code Execution Guide",
+                        description="Comprehensive guide for using PMCP with code execution patterns",
+                        mimeType="text/markdown",
+                    )
+                )
+
+            return resource_list
+
         @self._server.read_resource()
         async def read_resource(uri: AnyUrl) -> list[TextResourceContents]:
             # Find resource by URI
             uri_str = str(uri)
+
+            # Check if it's our L3 guidance resource
+            if uri_str == "pmcp://guidance/code-execution":
+                if not self._guidance_config.include_methodology_resource:
+                    raise ValueError("Code execution guidance resource is disabled")
+
+                # Read the guidance markdown file
+                guidance_path = (
+                    Path(__file__).parent / "resources" / "code_execution_guide.md"
+                )
+                if not guidance_path.exists():
+                    raise ValueError("Code execution guide not found")
+
+                with open(guidance_path) as f:
+                    content = f.read()
+
+                return [
+                    TextResourceContents(
+                        uri=AnyUrl(uri_str),
+                        mimeType="text/markdown",
+                        text=content,
+                    )
+                ]
+
+            # Otherwise, proxy to downstream servers
             resources = self._client_manager.get_all_resources()
             resource_info = next((r for r in resources if r.uri == uri_str), None)
 

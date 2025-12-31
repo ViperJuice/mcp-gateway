@@ -1,0 +1,67 @@
+# Code pattern hints for PMCP tools
+# These ultra-terse hints (5-8 chars max) suggest how to use tools in code
+# Adds ~8-12 tokens per capability card when enabled
+
+# Pattern definitions
+patterns:
+  loop:
+    hint: "loop"
+    description: "Use in a loop for batch operations"
+    keywords: ["navigate", "screenshot", "create", "update", "send", "fetch", "list", "get"]
+
+  filter:
+    hint: "filter"
+    description: "Filter output locally before returning to context"
+    keywords: ["search", "query", "list", "find", "select", "read"]
+
+  if_else:
+    hint: "if/else"
+    description: "Use conditional logic based on result"
+    keywords: ["status", "check", "get", "is", "has", "can"]
+
+  try_catch:
+    hint: "try/catch"
+    description: "Wrap in error handling"
+    keywords: ["invoke", "call", "execute", "run", "provision"]
+
+  poll:
+    hint: "poll"
+    description: "Poll until complete or timeout"
+    keywords: ["status", "wait", "pending", "progress"]
+
+# Tool-specific overrides (exact tool_id matches)
+# Format: "server::tool_name": "hint"
+overrides:
+  # Playwright
+  "playwright::browser_navigate": "loop"
+  "playwright::browser_screenshot": "loop"
+  "playwright::browser_click": "loop"
+
+  # File operations
+  "filesystem::list_files": "filter"
+  "filesystem::read_file": "try/catch"
+  "filesystem::write_file": "try/catch"
+
+  # GitHub
+  "github::listIssues": "filter"
+  "github::createIssue": "try/catch"
+
+  # Database operations
+  "postgres::query": "filter"
+  "sqlite::query": "filter"
+
+  # Browser automation
+  "puppeteer::navigate": "loop"
+  "puppeteer::screenshot": "loop"
+
+  # Provisioning
+  "gateway::provision": "try/catch"
+  "gateway::provision_status": "poll"
+
+  # Catalog operations
+  "gateway::catalog_search": "filter"
+  "gateway::describe": "if/else"
+  "gateway::invoke": "try/catch"
+
+# Default hint for tools without specific patterns
+default_hint: null  # Don't show hint if pattern unclear

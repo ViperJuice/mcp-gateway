@@ -157,6 +157,7 @@ class CapabilityCard(BaseModel):
     tags: list[str]
     availability: Literal["online", "offline"]
     risk_hint: str
+    code_hint: str | None = None  # L1: Ultra-terse code pattern hint (e.g., "loop", "filter")
 
 
 class CatalogSearchOutput(BaseModel):
@@ -202,6 +203,8 @@ class SchemaCard(BaseModel):
     # Direct invocation template
     invoke_as: str = "gateway.invoke"
     invoke_template: InvokeTemplate | None = None
+    # L2: Minimal code example (3-4 lines, opt-in via guidance config)
+    code_snippet: str | None = None
 
 
 class InvokeOptions(BaseModel):

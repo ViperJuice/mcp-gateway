@@ -11,10 +11,13 @@ from dotenv import load_dotenv
 from mcp.types import Tool
 
 from pmcp.client.manager import ClientManager
+from pmcp.config.guidance import GuidanceConfig
 from pmcp.config.loader import load_configs, manifest_server_to_config
 from pmcp.errors import ErrorCode, GatewayException, make_error
 from pmcp.identity import filter_self_references
+from pmcp.manifest.code_patterns_loader import get_code_hint
 from pmcp.manifest.environment import detect_platform, probe_clis
+from pmcp.templates.code_snippets_loader import get_code_snippet
 from pmcp.manifest.installer import (
     MissingApiKeyError,
     get_job_manager,
@@ -341,11 +344,13 @@ class GatewayTools:
         policy_manager: PolicyManager,
         project_root: Path | None = None,
         custom_config_path: Path | None = None,
+        guidance_config: GuidanceConfig | None = None,
     ) -> None:
         self._client_manager = client_manager
         self._policy_manager = policy_manager
         self._project_root = project_root
         self._custom_config_path = custom_config_path
+        self._guidance_config = guidance_config
         self._detected_clis: set[str] | None = None
         self._platform: str | None = None
 
@@ -413,20 +418,30 @@ class GatewayTools:
         tools = tools[: parsed.limit]
 
         # Convert to capability cards
-        results = [
-            CapabilityCard(
-                tool_id=t.tool_id,
-                server=t.server_name,
-                tool_name=t.tool_name,
-                short_description=t.short_description,
-                tags=t.tags,
-                availability="online"
-                if self._client_manager.is_server_online(t.server_name)
-                else "offline",
-                risk_hint=t.risk_hint.value,
+        results = []
+        for t in tools:
+            # Get code hint if guidance enabled
+            code_hint = None
+            if self._guidance_config and self._guidance_config.include_code_hints:
+                code_hint = get_code_hint(t.tool_id, t.tool_name, t.short_description)
+                # Trim to max length if configured
+                if code_hint and len(code_hint) > self._guidance_config.max_hint_length:
+                    code_hint = code_hint[: self._guidance_config.max_hint_length]
+
+            results.append(
+                CapabilityCard(
+                    tool_id=t.tool_id,
+                    server=t.server_name,
+                    tool_name=t.tool_name,
+                    short_description=t.short_description,
+                    tags=t.tags,
+                    availability="online"
+                    if self._client_manager.is_server_online(t.server_name)
+                    else "offline",
+                    risk_hint=t.risk_hint.value,
+                    code_hint=code_hint,
+                )
             )
-            for t in tools
-        ]
 
         return CatalogSearchOutput(
             results=results,
@@ -489,6 +504,17 @@ class GatewayTools:
             arguments=arg_placeholders,
         )
 
+        # Get code snippet if guidance enabled
+        code_snippet = None
+        if self._guidance_config and self._guidance_config.include_code_snippets:
+            # Try static template first, fallback to LLM generation for dynamic tools
+            code_snippet = get_code_snippet(
+                tool_info.tool_id,
+                max_lines=self._guidance_config.max_snippet_lines,
+                tool_info=tool_info,
+                use_llm_fallback=True,  # Enable LLM generation for tools without templates
+            )
+
         return SchemaCard(
             server=tool_info.server_name,
             tool_name=tool_info.tool_name,
@@ -496,6 +522,7 @@ class GatewayTools:
             args=args,
             safety_notes=safety_notes if safety_notes else None,
             invoke_template=invoke_template,
+            code_snippet=code_snippet,
         )
 
     async def invoke(self, input_data: dict[str, Any]) -> InvokeOutput:

@@ -116,7 +116,8 @@ class TestTemplateSummary:
         ]
         summary = template_summary(tools)
 
-        assert "MCP Gateway capabilities:" in summary
+        # Format changed with L0 guidance
+        assert "MCP Gateway:" in summary
         assert "playwright" in summary
         assert "context7" in summary
         assert "gateway.catalog_search" in summary
@@ -143,7 +144,8 @@ class TestGenerateCapabilitySummary:
     async def test_uses_template_when_llm_disabled(self) -> None:
         tools = [make_tool("server", "tool")]
         summary = await generate_capability_summary(tools, use_llm=False)
-        assert "MCP Gateway capabilities:" in summary
+        # Format changed with L0 guidance
+        assert "MCP Gateway:" in summary
 
     @pytest.mark.asyncio
     async def test_handles_empty_tools(self) -> None:

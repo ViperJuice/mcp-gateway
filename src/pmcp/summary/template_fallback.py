@@ -74,15 +74,24 @@ def group_by_server(tools: list[ToolInfo]) -> dict[str, list[ToolInfo]]:
     return dict(by_server)
 
 
-def template_summary(tools: list[ToolInfo]) -> str:
+def template_summary(tools: list[ToolInfo], include_code_guidance: bool = True) -> str:
     """Generate a simple template-based capability summary.
 
     Output format:
-    MCP Gateway capabilities:
+    MCP Gateway: Progressive tool discovery
+
+    Write code to orchestrate tools - use loops, filters, conditionals.
+    Search → describe → invoke via code execution.
+
+    Available capabilities:
     • server_name (N tools): capability1, capability2, capability3
     • other_server (M tools): capability1, capability2
 
-    Use gateway.catalog_search to explore tools.
+    Use gateway.catalog_search to explore available tools.
+
+    Args:
+        tools: List of tool info from connected servers
+        include_code_guidance: If True, include L0 code execution philosophy (default: True)
     """
     if not tools:
         return (
@@ -92,7 +101,16 @@ def template_summary(tools: list[ToolInfo]) -> str:
 
     by_server = group_by_server(tools)
 
-    lines = ["MCP Gateway capabilities:"]
+    lines = ["MCP Gateway: Progressive tool discovery"]
+
+    # L0: Code execution philosophy (ultra-terse, ~25-35 tokens)
+    if include_code_guidance:
+        lines.append("")
+        lines.append("Write code to orchestrate tools - use loops, filters, conditionals.")
+        lines.append("Search → describe → invoke via code execution.")
+
+    lines.append("")
+    lines.append("Available capabilities:")
 
     for server_name, server_tools in sorted(by_server.items()):
         capabilities = extract_capabilities(server_tools)
