@@ -17,10 +17,12 @@ class GuidanceLayers(BaseModel):
     """Configuration for individual guidance layers."""
 
     mcp_instructions: bool = Field(
-        default=True, description="L0: Philosophy in MCP server instructions (~25-35 tokens)"
+        default=True,
+        description="L0: Philosophy in MCP server instructions (~25-35 tokens)",
     )
     code_hints: bool = Field(
-        default=True, description="L1: Single-word hints in capability cards (~8-12 tokens/card)"
+        default=True,
+        description="L1: Single-word hints in capability cards (~8-12 tokens/card)",
     )
     code_snippets: bool = Field(
         default=False,
@@ -49,7 +51,9 @@ class GuidanceConfig(BaseModel):
         ),
     )
     layers: GuidanceLayers = Field(default_factory=GuidanceLayers)
-    max_hint_length: int = Field(default=8, description="Maximum characters for L1 code hints")
+    max_hint_length: int = Field(
+        default=8, description="Maximum characters for L1 code hints"
+    )
     max_snippet_lines: int = Field(
         default=4, description="Maximum lines for L2 code snippets (if enabled)"
     )
@@ -97,7 +101,9 @@ class GuidanceConfig(BaseModel):
         """Whether to register L3 methodology guide as a resource."""
         return self.layers.methodology_resource
 
-    def estimated_token_cost(self, num_search_results: int = 15, num_describes: int = 1) -> int:
+    def estimated_token_cost(
+        self, num_search_results: int = 15, num_describes: int = 1
+    ) -> int:
         """Estimate total token overhead for guidance in a typical workflow.
 
         Args:

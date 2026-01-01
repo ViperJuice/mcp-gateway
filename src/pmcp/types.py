@@ -157,7 +157,9 @@ class CapabilityCard(BaseModel):
     tags: list[str]
     availability: Literal["online", "offline"]
     risk_hint: str
-    code_hint: str | None = None  # L1: Ultra-terse code pattern hint (e.g., "loop", "filter")
+    code_hint: str | None = (
+        None  # L1: Ultra-terse code pattern hint (e.g., "loop", "filter")
+    )
 
 
 class CatalogSearchOutput(BaseModel):

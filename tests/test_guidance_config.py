@@ -178,8 +178,12 @@ class TestTokenBudgetEstimation:
 
     def test_budget_scales_with_describes(self) -> None:
         config = GuidanceConfig(level="standard")
-        no_describes = config.estimated_token_cost(num_search_results=10, num_describes=0)
-        with_describes = config.estimated_token_cost(num_search_results=10, num_describes=3)
+        no_describes = config.estimated_token_cost(
+            num_search_results=10, num_describes=0
+        )
+        with_describes = config.estimated_token_cost(
+            num_search_results=10, num_describes=3
+        )
         # More describes should cost more (L2 enabled in standard)
         assert with_describes > no_describes
 
@@ -190,7 +194,9 @@ class TestCodePatternHints:
     def test_exact_tool_id_override(self) -> None:
         # This tool has an override in code_patterns.yaml
         hint = get_code_hint(
-            "playwright::browser_navigate", "browser_navigate", "Navigate browser to URL"
+            "playwright::browser_navigate",
+            "browser_navigate",
+            "Navigate browser to URL",
         )
         assert hint is not None
         assert isinstance(hint, str)
@@ -204,12 +210,16 @@ class TestCodePatternHints:
 
     def test_keyword_matching_search(self) -> None:
         # Test keyword matching for "search"
-        hint = get_code_hint("jira::search_issues", "search_issues", "Search for issues")
+        hint = get_code_hint(
+            "jira::search_issues", "search_issues", "Search for issues"
+        )
         assert hint is not None
 
     def test_keyword_matching_find(self) -> None:
         # Test keyword matching for "find" (which is in filter pattern keywords)
-        hint = get_code_hint("api::find_results", "find_results", "Find matching results")
+        hint = get_code_hint(
+            "api::find_results", "find_results", "Find matching results"
+        )
         assert hint is not None
         # "find" is in filter pattern keywords
 

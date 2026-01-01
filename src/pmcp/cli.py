@@ -682,13 +682,15 @@ def run_guidance(args: argparse.Namespace) -> None:
     print("Code Execution Guidance Configuration")
     print("=" * 50)
     print(f"Level: {config.level}")
-    print(f"Config file: ~/.claude/gateway-guidance.yaml")
+    print("Config file: ~/.claude/gateway-guidance.yaml")
     print()
     print("Layers:")
     print(f"  L0 MCP Instructions: {'✓' if config.include_mcp_instructions else '✗'}")
     print(f"  L1 Code Hints: {'✓' if config.include_code_hints else '✗'}")
     print(f"  L2 Code Snippets: {'✓' if config.include_code_snippets else '✗'}")
-    print(f"  L3 Methodology Resource: {'✓' if config.include_methodology_resource else '✗'}")
+    print(
+        f"  L3 Methodology Resource: {'✓' if config.include_methodology_resource else '✗'}"
+    )
     print()
 
     if args.show_budget:

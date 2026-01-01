@@ -106,7 +106,9 @@ def template_summary(tools: list[ToolInfo], include_code_guidance: bool = True) 
     # L0: Code execution philosophy (ultra-terse, ~25-35 tokens)
     if include_code_guidance:
         lines.append("")
-        lines.append("Write code to orchestrate tools - use loops, filters, conditionals.")
+        lines.append(
+            "Write code to orchestrate tools - use loops, filters, conditionals."
+        )
         lines.append("Search → describe → invoke via code execution.")
 
     lines.append("")

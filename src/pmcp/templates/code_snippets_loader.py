@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 import yaml
 
@@ -60,7 +60,9 @@ class CodeSnippetsLoader:
 
         except Exception as e:
             # If loading fails, log warning but continue with empty snippets
-            print(f"Warning: Failed to load code snippets from {self._templates_path}: {e}")
+            print(
+                f"Warning: Failed to load code snippets from {self._templates_path}: {e}"
+            )
 
     def get_snippet_for_tool(
         self,

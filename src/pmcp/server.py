@@ -63,7 +63,9 @@ class GatewayServer:
         self._policy_manager = PolicyManager(policy_path)
 
         # Initialize guidance config
-        self._guidance_config: GuidanceConfig = load_guidance_config(guidance_config_path)
+        self._guidance_config: GuidanceConfig = load_guidance_config(
+            guidance_config_path
+        )
         logger.info(f"Guidance level: {self._guidance_config.level}")
 
         # Initialize client manager

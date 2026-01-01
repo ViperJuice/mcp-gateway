@@ -63,9 +63,13 @@ class CodePatternsLoader:
 
         except Exception as e:
             # If loading fails, log warning but continue with empty patterns
-            print(f"Warning: Failed to load code patterns from {self._patterns_path}: {e}")
+            print(
+                f"Warning: Failed to load code patterns from {self._patterns_path}: {e}"
+            )
 
-    def get_hint_for_tool(self, tool_id: str, tool_name: str, description: str) -> str | None:
+    def get_hint_for_tool(
+        self, tool_id: str, tool_name: str, description: str
+    ) -> str | None:
         """Get code hint for a tool.
 
         Checks in order:
