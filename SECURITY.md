@@ -133,6 +133,18 @@ PMCP is a local-first MCP gateway. Its default security posture assumes:
   tenant-scoped files derived from the resolved project root and must not read
   another tenant's file, but PMCP still does not provide cross-user identity or
   authorization isolation by itself.
+- **The project `.env` does not reach downstream servers**: PMCP reads a plain
+  `.env` for its own configuration at startup, and its credential-availability
+  check loads env files to answer a boolean. Both record which keys those loads
+  introduced into the gateway's environment, and `sanitized_subprocess_env`
+  strips exactly those keys from every spawned server, so an unrelated secret in
+  the operator's `.env` is no longer inherited by third-party MCP servers. A
+  server's own declared `env_var` is still supplied from a plain `.env` — that
+  key only, into that server only. Stripping is by recorded provenance, not by
+  key name: a variable the operator exported into their shell that merely also
+  appears in `.env` is untouched. Secrets the operator exported into the shell
+  itself are still inherited — deliberately, and out of scope
+  ([#229](https://github.com/Consiliency/pmcp/issues/229)).
 - **Tenant code-mode hosting keeps execution outside PMCP**: the host contract
   in `specs/tenant-code-mode-host-contract.md` treats PMCP as the broker and
   the companion tenant server as the sandbox execution authority. The contract

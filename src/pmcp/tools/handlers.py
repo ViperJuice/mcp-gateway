@@ -50,7 +50,11 @@ from pmcp.config.loader import (
     summarize_startup_resolution,
 )
 from pmcp.errors import ErrorCode, GatewayException, make_error
-from pmcp.env_store import sanitized_subprocess_env, set_env_value
+from pmcp.env_store import (
+    record_dotenv_keys,
+    sanitized_subprocess_env,
+    set_env_value,
+)
 from pmcp.validation import env_var_allowed, is_valid_package_name
 from pmcp.identity import filter_self_references
 from pmcp.manifest.code_patterns_loader import get_code_hint
@@ -2924,7 +2928,18 @@ class GatewayTools:
         )
 
     def _check_api_key_available(self, env_var: str | None) -> bool:
-        """Check if an API key is available in environment or any pmcp env store."""
+        """Check if an API key is available in environment or any pmcp env store.
+
+        This answers a boolean question by loading whole files into the
+        gateway's ``os.environ`` -- every key in them, not just the one asked
+        about. The load stays exactly as it was (so this predicate's answer is
+        bit-for-bit unchanged, interpolation and ``override=False`` precedence
+        included); what is new is that the keys each load INTRODUCES are
+        recorded, so ``sanitized_subprocess_env`` keeps them out of the servers
+        PMCP spawns (Consiliency/pmcp#229). Recording the delta rather than the
+        file's contents is what makes that strip safe -- see
+        ``env_store.record_dotenv_keys``.
+        """
         if not env_var:
             return False
 
@@ -2939,7 +2954,9 @@ class GatewayTools:
             Path.home() / ".config" / "pmcp" / "pmcp.env",
         ]:
             if env_path.exists():
+                before = set(os.environ)
                 load_dotenv(env_path)
+                record_dotenv_keys(set(os.environ) - before)
                 if os.environ.get(env_var):
                     return True
 
