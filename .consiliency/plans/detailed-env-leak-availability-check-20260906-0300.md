@@ -105,11 +105,21 @@ only).
 
 ### `src/pmcp/cli.py` (modify)
 
-- `main()` (`:2696-2702`) — modify — capture the before/after delta around the
-  **first** `load_dotenv()` (the plain `.env`) and pass it to
-  `record_dotenv_keys`. The two PMCP-store loads that follow need no recording:
-  `managed_secret_keys` already covers them. `load_dotenv` itself is unchanged —
-  the gateway still reads `.env` for its own configuration.
+- `load_startup_env()` — add — a **named, importable** function holding the three
+  startup loads currently inline in `main()` (`:2696-2702`), with the
+  before/after delta captured around the **first** `load_dotenv()` (the plain
+  `.env`) and passed to `record_dotenv_keys`. The two PMCP-store loads need no
+  recording: `managed_secret_keys` already covers them. `load_dotenv` itself is
+  unchanged — the gateway still reads `.env` for its own configuration.
+- `main()` — modify — call `load_startup_env()` in place of the inline loads.
+
+  **Why extract rather than inline the delta:** recording lives at the call site,
+  not inside `load_dotenv`. If the end-to-end test calls `load_dotenv` itself,
+  nothing is recorded and the test fails even against a correct implementation;
+  if the test calls `record_dotenv_keys` itself, it passes even when `main()`
+  never records — leaving the primary leak path unproven. A named function is
+  production code the test can execute directly, so the proof exercises the real
+  startup sequence.
 
 ### `src/pmcp/tools/handlers.py` (modify)
 
@@ -128,12 +138,21 @@ only).
 Each must fail on unchanged `main`:
 
 - `test_a_startup_env_secret_never_reaches_a_spawned_server` — **the honest
-  end-to-end proof.** Populate `os.environ` the way `main()` does (call
-  `load_dotenv` on a `.env` holding a sentinel PMCP does not manage), then assert
-  the sentinel **is** in `os.environ` — the gateway may see it — and **is not**
-  in `sanitized_subprocess_env()`. **WAS WRONG (rev 2.1):** the test asserted
-  absence after the availability check, which passes once that check stops
-  mutating *even if the sanitiser is never touched*.
+  end-to-end proof.** Call the **production** `cli.load_startup_env()` against a
+  `.env` holding a sentinel PMCP does not manage, then assert the sentinel **is**
+  in `os.environ` — the gateway may see it — and **is not** in
+  `sanitized_subprocess_env()`.
+  **WAS WRONG (rev 2.1):** asserted absence after the availability check, which
+  passes once that check stops mutating even if the sanitiser is untouched.
+  **WAS WRONG (rev 3):** called `load_dotenv` directly. Recording lives at the
+  call site, so that test either fails against a correct fix (nothing recorded)
+  or, if patched to call `record_dotenv_keys` itself, passes while `main()` still
+  leaks. Neither pins the primary path. The test must run production code.
+- `test_main_uses_the_recording_startup_path` — the wiring guard: `main()` must
+  call `load_startup_env()`, asserted by patching it and requiring it to be
+  invoked (or by AST, as in the #225 guards). Without this, the extraction can be
+  bypassed by a future edit re-inlining a bare `load_dotenv()` and every other
+  test still passes.
 - `test_a_shell_provided_variable_sharing_a_name_is_not_stripped` — put a
   variable already present in the environment into the `.env` too; it must
   survive into the child env with the operator's value. This is rev 2.1's
