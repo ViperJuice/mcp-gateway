@@ -61,9 +61,17 @@ def _check_api_key_available(self, env_var: str | None) -> bool:
 
 Note the shape: the function answers a **boolean question** and its only way of
 answering is to **change global process state**. Every key in the file is loaded,
-not just `env_var`. It is the sole `load_dotenv` in `handlers.py` (`:2942`); the
-three in `cli.py` (`:2699-2702`) are deliberate startup configuration and are
-**out of scope**.
+not just `env_var`. It is the sole `load_dotenv` in `handlers.py` (`:2942`).
+
+**But it is not the only way the project `.env` enters `os.environ`, and not even
+the first.** `cli.py:2696-2702` — `main()`, the gateway entry point — calls bare
+`load_dotenv()` before anything else, which loads `<cwd>/.env` unconditionally at
+startup. **WAS WRONG (rev 1):** it called the `cli.py` calls "deliberate startup
+configuration and out of scope", which would have left the primary leak path
+open while the plan claimed the leak was closed. The startup load itself is
+legitimate — the gateway may read `.env` for its own configuration — so the fix
+belongs at the boundary where those keys must *stop*: the subprocess
+environment.
 
 **The leak reaches spawned servers, and the code says so.** `env_store.sanitized_subprocess_env`
 (`src/pmcp/env_store.py:124`) builds a downstream server's environment from
