@@ -1,4 +1,36 @@
-# Detailed plan: stop an availability *check* from loading the project `.env` into the gateway
+# Detailed plan: stop the project `.env` reaching downstream servers
+
+> **Revision 2 (2026-09-06).** Rev 1 boarded 1 AGREE / 1 PARTIALLY AGREE / 1
+> DISAGREE. Four defects, all verified against source; one is a **scope error
+> that would have shipped a fix which did not close the leak**.
+>
+> 1. **`cli.py:2699` is the primary leak path, and rev 1 declared it out of
+>    scope.** `main()` — the gateway entry point — calls bare `load_dotenv()`,
+>    which loads the project `.env` into `os.environ` at startup,
+>    unconditionally, before any availability check runs. Fixing only
+>    `_check_api_key_available` would have closed a side door, left the front
+>    door open, and then updated SECURITY.md to say the leak was closed. The
+>    centre of gravity moves accordingly (see Changes).
+> 2. **The resolver was never wired.** Rev 1 put the non-mutating resolver in
+>    `loader.py` but did not list the `handlers.py` call site that actually
+>    passes `os.environ.get` — so decision (A) would not have worked and
+>    `test_the_servers_own_credential_still_resolves` would have failed. Found
+>    independently by two seats.
+> 3. **`interpolate=False` is not equivalent to `load_dotenv`.** Measured:
+>    for `DERIVED=${BASE}/x`, `dotenv_values(..., interpolate=False)` yields the
+>    literal `${BASE}/x` while `load_dotenv` yields `abc/x`. Swapping one for the
+>    other silently changes values, which the "same boolean as main" criterion
+>    would not necessarily catch.
+> 4. **Removing the import breaks an existing test.** `tests/test_tools.py:3587`
+>    does `monkeypatch.setattr("pmcp.tools.handlers.load_dotenv", ...)`; deleting
+>    the import makes that raise `AttributeError`.
+>
+> Also carried in: `read_env_file` must be guarded against `OSError` /
+> `PermissionError` on an existing-but-unreadable file, and empty-value priority
+> differs between the two approaches (an empty higher-priority value blocks a
+> later file under `load_dotenv`'s no-override semantics, but not under
+> per-file dicts).
+
 
 ## Task
 
@@ -102,13 +134,41 @@ deliberate deprecation with a CHANGELOG note, not a side effect of a security fi
 
 ## Changes
 
+### `src/pmcp/env_store.py` (modify) — the load-bearing change
+
+**The leak is closed at the boundary that owns it.** The gateway legitimately
+loads `.env` for its own configuration (`cli.py:2699`); what must not happen is
+that those keys are inherited by third-party downstream servers. So
+`sanitized_subprocess_env` — which already exists to strip PMCP-managed keys and
+already documents this exact gap — also strips keys sourced from the **project
+`.env`**, except the server's own declared `env_var` (decision (A)).
+
+- `project_env_keys(project)` — add — `set(read_env_file(<project>/".env"))`,
+  `OSError`-guarded, returning an empty set when absent or unreadable.
+- `sanitized_subprocess_env` — modify — strip `managed_secret_keys(...)` **and**
+  `project_env_keys(...)`, then apply `own_env` (which still wins, so the
+  declared credential is restored for the server that declared it).
+- The docstring's "secrets the operator exported into the shell or a plain
+  `.env` are not sanitized here" — modify — a plain `.env` now **is** stripped;
+  shell-exported secrets still are not. Do not overclaim the second half.
+
 ### `src/pmcp/tools/handlers.py` (modify)
 
 - `_check_api_key_available` — modify — answer from `env_store.read_env_file(path)`
   instead of `load_dotenv(path)` + `os.environ.get`. Check `os.environ` first
   (unchanged fast path), then each file's parsed dict. **No process state is
   mutated.** Docstring states that the check is now side-effect free and why.
-- The `load_dotenv` import (`:21`) — delete — this is its only use in the module.
+- The `load_dotenv` import (`:21`) — **keep**, or update
+  `tests/test_tools.py:3587` in the same change. **WAS WRONG (rev 1):** "delete"
+  — that test monkeypatches `pmcp.tools.handlers.load_dotenv` and `setattr`
+  raises when the attribute is gone. Deleting it is fine *if* the test is updated
+  to patch the new seam; decide once, and state which.
+- The `_manifest_server_to_config(..., os.environ.get)` call site — modify — pass
+  the non-mutating resolver instead. **WAS WRONG (rev 1):** the resolver was
+  specified in `loader.py` and never wired here, so decision (A) would not have
+  worked.
+- `read_env_file` calls — wrap in `try/except OSError` — an existing-but-unreadable
+  `.env` must answer "no", not raise.
 
 ### `src/pmcp/config/loader.py` (modify)
 
@@ -197,7 +257,10 @@ whose value is empty (today falsy → "not available"; keep that).
 
 ## Non-goals
 
-- The three `load_dotenv` calls in `cli.py` — deliberate startup configuration.
+- **Removing** `cli.py`'s startup `load_dotenv()`. The gateway may keep reading
+  `.env` for its own configuration; what changes is that those keys no longer
+  reach downstream servers. **WAS WRONG (rev 1):** this was listed as simply out
+  of scope, which is what let the primary leak path survive the fix.
 - Sanitising shell-exported secrets. `sanitized_subprocess_env` inherits ambient
   environment by design; changing that is a separate decision with a much larger
   blast radius.
