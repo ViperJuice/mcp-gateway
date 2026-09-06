@@ -35,6 +35,7 @@ from pmcp.config.loader import (
     load_configs,
     set_startup_policy,
 )
+from pmcp.env_store import record_dotenv_keys
 from pmcp.manifest.loader import load_manifest
 from pmcp.types import StartupPolicyOperation
 
@@ -2693,13 +2694,48 @@ async def async_main(args: argparse.Namespace) -> None:
         await run_server(args)
 
 
-def main() -> None:
-    """Main entry point."""
-    # Load .env file from current directory or project root
-    load_dotenv()
+def load_startup_env(dotenv_path: str | os.PathLike[str] | None = None) -> None:
+    """Load the startup env files, recording what the plain ``.env`` introduced.
+
+    These are the loads that used to sit inline in ``main()``. ``load_dotenv``
+    is called with its semantics COMPLETELY unchanged -- default path discovery,
+    interpolation and ``override=False`` precedence all behave exactly as
+    before, and the gateway still reads ``.env`` for its own configuration.
+
+    What is new is that the keys the plain ``.env`` introduced *into this
+    process* are recorded, so ``sanitized_subprocess_env`` can keep them out of
+    the third-party servers PMCP spawns (Consiliency/pmcp#229, review finding
+    S-02). The delta is the provenance: a variable the operator already had in
+    their environment is in ``before``, so it is never recorded and never
+    stripped -- which is exactly right, because ``override=False`` means such a
+    variable did not come from the file.
+
+    The two PMCP-store loads need no recording; ``managed_secret_keys`` already
+    covers those keys.
+
+    ``dotenv_path`` is a test seam, and ``None`` -- the production call -- is
+    identical to the bare ``load_dotenv()`` this replaced: ``find_dotenv``
+    resolves the path by walking up from THIS module's directory either way. It
+    exists because that frame-based discovery cannot be pointed at a ``tmp_path``
+    (``monkeypatch.chdir`` has no effect on it), and the end-to-end proof of
+    #229 has to run this production function rather than call ``load_dotenv``
+    itself. ``tests/test_env_leak_229.py`` asserts ``main()`` still passes
+    nothing.
+    """
+    before = set(os.environ)
+    load_dotenv(dotenv_path)
+    record_dotenv_keys(set(os.environ) - before)
     # Load PMCP credential stores written by auth_connect (don't override already-set vars)
     load_dotenv(Path.home() / ".config" / "pmcp" / "pmcp.env", override=False)
     load_dotenv(Path.cwd() / ".env.pmcp", override=False)
+
+
+def main() -> None:
+    """Main entry point."""
+    # Load .env from the current directory or project root, plus the PMCP
+    # credential stores -- recording which keys the plain .env introduced so
+    # they do not reach downstream servers (Consiliency/pmcp#229).
+    load_startup_env()
 
     args = parse_args()
 

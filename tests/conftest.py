@@ -30,12 +30,14 @@ passes for the wrong reason and looks green forever. So:
 from __future__ import annotations
 
 import tempfile
+from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from pmcp.env_store import reset_dotenv_keys
 from pmcp.policy.policy import PolicyManager
 from pmcp.types import (
     LocalMcpServerConfig,
@@ -45,6 +47,23 @@ from pmcp.types import (
     ServerStatusEnum,
     ToolInfo,
 )
+
+
+@pytest.fixture(autouse=True)
+def _reset_dotenv_provenance() -> Iterator[None]:
+    """Keep the dotenv provenance registry from leaking between tests.
+
+    ``env_store``'s registry of keys PMCP loaded from a dotenv file
+    (Consiliency/pmcp#229) is process-global, and production paths that tests
+    exercise write to it: any test that drives ``_check_api_key_available``
+    against a real ``.env`` records that file's keys. Without this reset, those
+    keys would be stripped from every LATER test's
+    ``sanitized_subprocess_env()`` -- an order-dependent failure in tests that
+    have nothing to do with #229.
+    """
+    reset_dotenv_keys()
+    yield
+    reset_dotenv_keys()
 
 
 # === Sample Data Factories ===

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 
 from dotenv import dotenv_values
@@ -104,6 +104,56 @@ def write_env_file(path: Path, values: dict[str, str]) -> None:
         env_file.write(content)
 
 
+# Env-var keys PMCP itself introduced into its OWN environment from a dotenv
+# file. Provenance, not file contents: see record_dotenv_keys (Consiliency/pmcp#229).
+_DOTENV_SOURCED_KEYS: set[str] = set()
+
+
+def record_dotenv_keys(keys: Iterable[str]) -> None:
+    """Record env-var keys that PMCP itself introduced from a dotenv file.
+
+    Callers record the delta they measured around their own ``load_dotenv``
+    call -- ``set(os.environ)`` after, minus before -- so this registry holds
+    *provenance*, never file contents, and never a re-parse:
+
+    .. code-block:: python
+
+        before = set(os.environ)
+        load_dotenv(...)                       # semantics untouched
+        record_dotenv_keys(set(os.environ) - before)
+
+    Recording rather than re-deriving is what makes the strip correct.
+    ``load_dotenv`` defaults to ``override=False``, so a variable the operator
+    exported into their shell is left alone even when a dotenv file names it
+    too; such a variable is already in ``before``, so it is never recorded and
+    never stripped. Stripping by key name instead would delete the operator's
+    ``PATH`` from every spawned server. Interpolation and empty-value shadowing
+    need no emulation either -- whatever ``load_dotenv`` did is what is recorded.
+
+    Additive and idempotent. An empty registry is the correct default: PMCP
+    imported as a library, with ``main()`` never run, has loaded no dotenv file
+    and so strips nothing extra.
+    """
+    _DOTENV_SOURCED_KEYS.update(keys)
+
+
+def dotenv_sourced_keys() -> frozenset[str]:
+    """Keys PMCP introduced into its own environment from dotenv files."""
+    return frozenset(_DOTENV_SOURCED_KEYS)
+
+
+def reset_dotenv_keys() -> None:
+    """Clear the dotenv provenance registry. **Test-only seam.**
+
+    Production never calls this: the registry only grows, as startup and
+    availability-check loads happen. Tests need it because the registry is
+    process-global -- without a reset, keys one test recorded would be stripped
+    from every later test's subprocess environment. An autouse fixture in
+    ``tests/conftest.py`` calls it around every test.
+    """
+    _DOTENV_SOURCED_KEYS.clear()
+
+
 def managed_secret_keys(project: Path | None = None) -> set[str]:
     """Env-var keys of credentials PMCP manages in its user/project secret stores.
 
@@ -132,11 +182,22 @@ def sanitized_subprocess_env(
     (e.g. a server whose runtime env_var equals a managed key gets its own value
     back). Non-secret ambient vars (PATH/HOME/NODE_*/proxy/locale) are preserved.
 
-    Note: this removes only PMCP-managed keys; secrets the operator exported into
-    the shell or a plain ``.env`` are not sanitized here.
+    Also stripped: keys PMCP introduced into its own environment from a dotenv
+    file (``dotenv_sourced_keys``) -- the operator's project ``.env`` reached
+    the gateway through ``cli.load_startup_env`` and the availability check, and
+    was inherited by every server PMCP spawned (Consiliency/pmcp#229). Those keys
+    are stripped by recorded provenance, not by name, so a shell-exported
+    variable that merely shares a name with a ``.env`` entry survives. A server's
+    OWN declared ``env_var`` still arrives via ``own_env``, which is applied
+    after the strip.
+
+    Note: secrets the operator exported into their shell are still inherited --
+    deliberately, and out of scope here.
     """
     env = os.environ.copy()
     for key in managed_secret_keys(project):
+        env.pop(key, None)
+    for key in dotenv_sourced_keys():
         env.pop(key, None)
     if own_env:
         env.update(own_env)

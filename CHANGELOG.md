@@ -8,6 +8,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Security
+- **The operator's project `.env` no longer reaches the servers PMCP spawns.**
+  `pmcp`'s entry point loads `<project>/.env` into its own environment at
+  startup, and `_check_api_key_available` loads whole env files to answer a
+  boolean — while `sanitized_subprocess_env` builds every downstream server's
+  environment from `os.environ.copy()`. Every key in the operator's `.env`, not
+  just PMCP's own, was therefore inherited by every third-party MCP server the
+  gateway launched. Both load sites now record the keys their `load_dotenv` call
+  introduced into the process, and the subprocess sanitizer strips exactly those.
+  The mechanism is recorded provenance, never a re-parse: `load_dotenv`'s
+  semantics are untouched — interpolation, `override=False` precedence and the
+  credential-availability boolean are all bit-for-bit unchanged — and a variable
+  the operator exported into their shell that merely shares a name with a `.env`
+  entry is not in the delta, so it is not stripped (stripping by name would have
+  deleted the operator's `PATH` from every spawned server). A server's own
+  declared `env_var` may still come from a plain `.env`: `own_env` is applied
+  after the strip, so that key reaches that server and nothing else in the file
+  does. Shell-exported secrets are still inherited, deliberately. Found by the
+  2026-09-01 codebase review (S-02); see
+  [#229](https://github.com/Consiliency/pmcp/issues/229).
 - **Dependency advisories on the auth path are closed, and CI now fails on new
   ones.** `pip-audit` reported nine advisories against the shipped lockfile; the
   one that mattered most was **PYSEC-2026-176 in PyJWT 2.10.1, a verifier-side
