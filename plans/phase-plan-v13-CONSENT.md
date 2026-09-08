@@ -59,7 +59,15 @@ Two constraints shape every lane:
 ## Interface Freeze Gates
 
 - [ ] IF-0-CONSENT-1 — the single project-source gate, `src/pmcp/project_consent.py`. `ProjectSourceKind = Literal["project_manifest", "project_mcp_json", "project_policy"]`; frozen `ConsentDecision(allowed: bool, path: Path, kind: ProjectSourceKind, reason: str, remediation: str)` where `reason` is the closed vocabulary `{"approved", "no_record", "content_changed", "unreadable"}` and `remediation` is the exact shell string `pmcp trust approve <absolute path>` (empty only when `allowed` is True); `read_and_gate(path: Path, kind: ProjectSourceKind) -> tuple[bytes | None, ConsentDecision]` performs **exactly one** read and gates those bytes, returning the bytes only when `allowed` (the caller parses the returned bytes and MUST NOT re-open the path); `gate_bytes(path: Path, content: bytes, kind: ProjectSourceKind) -> ConsentDecision` for callers that already hold bytes; `log_refusal(decision: ConsentDecision, logger: logging.Logger) -> None` emits the single WARNING format naming `decision.remediation`. Every failure mode — unreadable file, store I/O error, any exception from the trust store — returns `allowed=False`; the gate never raises to a caller that might read a raise as permission.
-- [ ] IF-0-CONSENT-2 — **conjunctive** policy composition, not list intersection. `PolicyManager` gains a private `_project_policy: GatewayPolicy | None`; every predicate returns `user_result and (project is None or project_result)`, so a server/tool/resource/prompt is allowed only if **both** policies allow it. List intersection of glob *strings* is rejected as wrong: user `github*` ∩ project `github-mcp` is empty although `github-mcp` must stay allowed. Denylists compose by union (implied by conjunction); `get_max_tools_per_server`, `get_max_output_bytes`, `get_max_output_tokens` return `min(user, project)`; `redact_secrets` compiles the union of the two **effective** pattern sets, where "effective" means each policy's `redaction.patterns` **or** `DEFAULT_REDACTION_PATTERNS` when that list is empty. The naive list union is rejected as a widening: `_compile_redaction_patterns` (`policy/policy.py:142`) does `patterns or DEFAULT_REDACTION_PATTERNS`, so with a common empty user list, `[] + ["x"]` is truthy and would **drop every default pattern** — a repository file silently reducing secret redaction, the S-11 class again. Limits take `min()` over **explicitly-set fields only** (`model_fields_set`), not over effective values: a project policy that never mentions `limits` still carries Pydantic defaults (100 / 50000 / 4000), and min-over-effective would silently drag a raised user limit back down. `policy_digest` hashes both policies so a project policy is never invisible. `explicit_policy` and `is_scoped_advisor_policy` are unchanged: an explicit `--policy` skips discovery and composition entirely.
+- [ ] IF-0-CONSENT-2 — **conjunctive** policy composition, not list intersection. `PolicyManager` gains a private `_project_policy: GatewayPolicy | None`; every predicate returns `user_result and (project is None or project_result)`, so a server/tool/resource/prompt is allowed only if **both** policies allow it. List intersection of glob *strings* is rejected as wrong: user `github*` ∩ project `github-mcp` is empty although `github-mcp` must stay allowed. Denylists compose by union (implied by conjunction); `get_max_tools_per_server`, `get_max_output_bytes`, `get_max_output_tokens` return `min(user, project)`; `redact_secrets` compiles the union of the two **effective** pattern sets, where "effective" means each policy's `redaction.patterns` **or** `DEFAULT_REDACTION_PATTERNS` when that list is empty. The naive list union is rejected as a widening: `_compile_redaction_patterns` (`policy/policy.py:142`) does `patterns or DEFAULT_REDACTION_PATTERNS`, so with a common empty user list, `[] + ["x"]` is truthy and would **drop every default pattern** — a repository file silently reducing secret redaction, the S-11 class again. Limits take `min()` over the user's **effective** value and the project's
+**explicitly-set** value only (`model_fields_set`), asymmetrically. Neither symmetric rule is
+safe: min-over-effective lets a project policy that never mentions `limits` drag a raised user
+limit back down via its Pydantic defaults (100 / 50000 / 4000), while min-over-explicitly-set-on-
+both-sides is **worse — it widens**. If the user never set `max_tools_per_server` (effective 100)
+and an approved project sets `1000`, the only explicitly-set value is the project's, so `min()`
+over that set returns 1000 and a repository file raises the operator's ceiling. That is the S-11
+class this phase exists to close, arriving through the limits path. The user's effective value is
+therefore always a term; only the project's unset fields are excluded. `policy_digest` hashes both policies so a project policy is never invisible. `explicit_policy` and `is_scoped_advisor_policy` are unchanged: an explicit `--policy` skips discovery and composition entirely.
 
 ## Lane Index & Dependencies
 
@@ -258,9 +266,19 @@ not weakening the old one.
   Per the roadmap DAG note, execute SL-4 and PKGID's policy lane serially against
   it, or land one phase's policy lane before opening the other's. SL-4 adds
   `_project_policy` and makes every predicate conjunctive; PKGID's lane adds
-  package-identifier predicates. If PKGID lands first, SL-4 must make the new
-  package predicates conjunctive too — a package predicate that reads only
+  package-identifier predicates. If PKGID lands first, SL-4 must compose the new
+  package predicates too — a package predicate that reads only
   `self._policy` would let an approved project policy widen package permissions,
+  **but it must NOT be composed with the boolean rule above.** PKGID's
+  `evaluate_package_policy` is tri-state (`"denied"` / `"allowed"` / `"unspecified"`),
+  and all three are truthy strings, so `user_result and project_result` returns the
+  *second* operand: composing a user `"denied"` with a project `"allowed"` yields
+  `"allowed"` — a user denial silently inverted by a repository file. The tri-state
+  composition rule is separate and explicit: if either side is `"denied"` the result is
+  `"denied"`; a project `"allowed"` never independently grants (it can only fail to
+  deny, leaving the user's own verdict to decide); otherwise the result is the user's
+  verdict. This must be covered by a test with both phases integrated, not by either
+  phase alone,
   silently reopening EC-CONSENT-3 through a door PKGID built.
 - **Cross-phase single-writer — docs.** `CHANGELOG.md` and
   `specs/phase-plans-v13.md` are owned by SL-docs here and by PKGID's docs lane

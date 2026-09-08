@@ -18,6 +18,12 @@ the review's line numbers have drifted since it was written.
 `:5496-5571`) accepts any `package` that clears `is_valid_package_name`
 (`src/pmcp/validation.py:16-30`) and stores
 `ServerConfig(command="npx", args=["-y", package], install={<every platform>: ["npx","-y",package]})`
+
+  **Both argv are pinned, not just `install`.** `client/manager.py:2349` spawns the
+  server with `*local_config.args`, so pinning only `install_command` would approve
+  `pkg@1.2.3`, install those bytes, and then re-resolve `npx -y pkg` to *latest* at
+  every subsequent server start — defeating this phase at the spawn path. Registration
+  writes the resolved spec into `args` as well: `args == ["-y", f"{name}@{version}"]`.
 into `self._discovered_server_configs` (`:5550`). `provision` (`:4127`) then checks
 `self._policy_manager.is_server_allowed(server_name)` (`:4135`) — the **agent-supplied
 name** — and reaches `job_manager.start_install(server_config, platform)` (`:4483`),
@@ -71,9 +77,15 @@ extends neither's file.
   (6) otherwise — including `"unspecified"` — deny,
   reason `not_approved`; (7) **any** exception reading the store or the policy denies
   rather than propagating — a caller must never be able to read a raise as
-  permission. `reason` is that closed six-value vocabulary. `remedy` is `None` when
-  allowed and otherwise the exact runnable string
-  `pmcp trust approve-package <name>@<resolved_version>`. `source` is decided by the
+  permission. `reason` is that closed six-value vocabulary. `remedy` is `None` when allowed, and otherwise
+  **depends on the reason** — a single frozen string is unconstructible for two of the
+  deny branches. `package_approved`-shaped refusals (`not_approved`) use the exact
+  runnable `pmcp trust approve-package <name>@<resolved_version>`. Reason
+  `unresolvable_identity` has no `identity`, so there is no name or version to compose:
+  its remedy names the registry lookup that failed and is not an approval command.
+  Reason `denied` (policy denylist) takes precedence over any approval by rule 1, so
+  offering `approve-package` there would advertise a remedy that cannot work; its remedy
+  points at the operator's policy file instead. `source` is decided by the
   **lookup path that produced the config**, never by a field on `server_config` — the
   agent controls those fields.
   The policy predicate is deliberately **tri-state, not a bool**. A bool cannot carry
@@ -191,10 +203,14 @@ fail SL-2.4 at collection.
 | SL-3.3 | verify | SL-3.2 | `src/pmcp/manifest/installer.py`, `tests/test_install_argv_logging.py` | all SL-3 tests | `uv run pytest -q tests/test_install_argv_logging.py tests/test_manifest.py tests/test_manifest_provision.py` |
 
 Today `start_install` logs at INFO with the literal `<args redacted>`
-(`installer.py:126-128`). The redaction is unnecessary — `install_cmd` is
-`["npx","-y",…]`; secrets live in the child env built by
-`build_install_child_env`, not in argv — and it is exactly what makes an arbitrary
-package execution invisible in the operator's log. Each site logs immediately before
+(`installer.py:126-128`). The blanket redaction is what makes an arbitrary package
+execution invisible in the operator's log, but the premise that argv never carries a
+secret is **false as stated**: the shipped manifest's install commands are not all
+`npx` (167 `npx`, 38 `uvx`, 1 `cmd`), and a manifest may supply an arbitrary install
+command whose arguments could carry a credential. So the log is not un-redacted
+wholesale. `npx`/`uvx` package specs — the argv this phase exists to make visible —
+are logged verbatim; any other command keeps argument redaction. Secrets otherwise
+live in the child env built by `build_install_child_env`, not in argv. Each site logs immediately before
 its `create_subprocess_exec` (`:135`, `:609`, `:651`), inside the `try` but ahead of
 the call, so a `FileNotFoundError` spawn still leaves a record.
 
@@ -239,8 +255,9 @@ the call, so a `FileNotFoundError` spawn still leaves a record.
   `ServerConfig`; the registry-supplied version is validated against a strict pattern
   before it is composed into argv; `validation.py` is assigned an explicit owner
   rather than left unowned in the roadmap's Key files; EC-PKGID-6 is phrased so it
-  fails on unchanged `main`; and the roadmap's own `SECURITY.md` evidence path is
-  mirrored verbatim rather than silently dropped.
+  fails on unchanged `main`; and the roadmap's stale `SECURITY.md` evidence path was
+  reported upward rather than silently dropped — it has since been removed from the
+  roadmap, in the same PR that landed this plan.
 - **Single-writer files**: `src/pmcp/tools/handlers.py` — owner **SL-1**, and this is
   the single-writer hazard of the whole v13 roadmap. It is 6274 lines and the
   roadmap's EGRESS phase writes it from **both** of its lanes (`:4796-4992`). Do not
@@ -308,7 +325,7 @@ the call, so a `FileNotFoundError` spawn still leaves a record.
 - [ ] EC-PKGID-2 — proven by `uv run pytest -q tests/test_package_identity_gate.py::test_policy_denylist_blocks_an_approved_package tests/test_package_identity_gate.py::test_policy_package_allowlist_permits_provision_without_a_recorded_approval tests/test_package_identity_gate.py::test_package_denylist_beats_a_recorded_approval tests/test_policy_package_identifiers.py::test_evaluate_package_policy_denylist_beats_allowlist tests/test_policy_package_identifiers.py::test_a_policy_with_no_packages_section_returns_unspecified`, falsified by a policy whose `servers.allowlist` permits the *name* while `packages.denylist` names the package, asserting provision is refused — deny wins over both the name allowlist and a recorded approval; and at the policy layer by asserting an unconfigured `packages` section returns `"unspecified"` rather than a default-allow `True`. Fails on `main`: `GatewayPolicy` has no `packages` section.
 - [ ] EC-PKGID-3 — proven by `uv run pytest -q tests/test_package_identity_gate.py::test_discovered_provisioning_is_denied_without_opt_in tests/test_package_identity_gate.py::test_a_manifest_backed_server_provisions_unchanged tests/test_package_identity_gate.py::test_source_is_taken_from_the_lookup_path_not_from_server_config`, falsified by provisioning a freshly discovered server with no approval and no policy entry and asserting refusal, while a manifest-backed name provisions with no approval at all; and by a discovered config carrying `declared_capabilities=["manifest"]` still being treated as `source="discovered"`. Fails on `main`: the first case succeeds today.
 - [ ] EC-PKGID-4 — proven by `uv run pytest -q tests/test_install_argv_logging.py::test_start_install_logs_exact_argv_at_warning tests/test_install_argv_logging.py::test_legacy_install_server_logs_exact_argv_at_warning tests/test_install_argv_logging.py::test_verify_installation_logs_exact_argv_at_warning tests/test_install_argv_logging.py::test_argv_is_logged_even_when_the_spawn_fails`, falsified with `caplog.at_level(logging.WARNING)` asserting the full joined argv appears at WARNING before the spawn, and still appears when `create_subprocess_exec` raises `FileNotFoundError`. Fails on `main`: the only log is INFO and literally contains `<args redacted>` (`installer.py:126-128`).
-- [ ] EC-PKGID-5 — proven by `uv run pytest -q tests/test_package_identity_gate.py::test_a_resolvable_registration_records_the_version_and_pins_the_install_argv tests/test_package_identity_gate.py::test_an_unresolvable_registration_is_refused_at_registration tests/test_package_identity_gate.py::test_a_resolved_version_that_fails_validation_is_refused tests/test_policy_package_identifiers.py::test_a_registry_supplied_version_with_metacharacters_is_rejected`, falsified by asserting the **chosen** branch: a resolvable spec registers with `resolved_version` recorded and `install_command == ["npx","-y","pkg@<version>"]` for every platform key, an unresolvable spec returns `registered=False` from `register_discovered_server` itself, and a registry-returned version failing `is_valid_package_version` is refused rather than composed into argv. Fails on `main`: registration stores `["npx","-y","pkg"]` unpinned and never resolves a version.
+- [ ] EC-PKGID-5 — proven by `uv run pytest -q tests/test_package_identity_gate.py::test_a_resolvable_registration_records_the_version_and_pins_the_install_argv tests/test_package_identity_gate.py::test_an_unresolvable_registration_is_refused_at_registration tests/test_package_identity_gate.py::test_a_resolved_version_that_fails_validation_is_refused tests/test_policy_package_identifiers.py::test_a_registry_supplied_version_with_metacharacters_is_rejected`, falsified by asserting the **chosen** branch: a resolvable spec registers with `resolved_version` recorded and `install_command == ["npx","-y","pkg@<version>"]` for every platform key **and** the runtime `args == ["-y","pkg@<version>"]` (the argv `client/manager.py:2349` actually spawns), an unresolvable spec returns `registered=False` from `register_discovered_server` itself, and a registry-returned version failing `is_valid_package_version` is refused rather than composed into argv. Fails on `main`: registration stores `["npx","-y","pkg"]` unpinned and never resolves a version.
 - [ ] EC-PKGID-6 — proven by `uv run pytest -q tests/test_package_identity_gate.py::test_an_approved_package_provisions_after_the_refusal tests/test_package_identity_gate.py::test_a_manifest_backed_server_provisions_unchanged tests/test_package_approvals.py::test_a_store_read_failure_denies_rather_than_raises`, falsified by the round trip: provision is refused, `approve_package(identity)` is recorded, the same provision then reaches `start_install` with the pinned argv. There is **nothing durable to migrate** — `_discovered_server_configs` is a process-local instance dict (`handlers.py:1126`) and `server.py:387-388` merely dispatches, so no persisted registration survives a restart today. Grandfathering is therefore the explicit recorded decision the operator makes once, prompted by a refusal that names the exact command (EC-PKGID-1), and manifest-backed servers — the only servers that *do* persist — are untouched by construction. Assumption 5 is satisfied in its letter: the change is loud, not silent. Regression evidence for the untouched operator is the suite-count comparison in `## Verification`.
 
 ## Verification
@@ -340,9 +357,9 @@ after, never against a clean-machine expectation.
 - schema: `spec_delta_closeout.v1`
 - decision: `no_spec_delta`
 - target surfaces: `src/pmcp/tools/handlers.py`, `src/pmcp/policy/policy.py`, `src/pmcp/manifest/installer.py`
-- evidence paths: `tests/test_package_identity_gate.py`, `SECURITY.md`, `CHANGELOG.md`
+- evidence paths: `tests/test_package_identity_gate.py`, `CHANGELOG.md`
 - redaction posture: `metadata_only`
-- downstream handling: none — `SECURITY.md` is mirrored verbatim from the roadmap's PKGID evidence paths, but the roadmap's own Execution Notes assign the trust-model write-up to SEAL, so SL-docs.2 records the deliberate skip rather than writing a fourth partial description of one model.
+- downstream handling: none — `SECURITY.md` was removed from this phase's roadmap evidence paths in the same PR that landed this plan; the trust-model write-up belongs to SEAL. No skip needs recording, because the roadmap no longer asks for it.
 
 ## Execution Policy
 
