@@ -2,7 +2,7 @@
 phase_loop_plan_version: 1
 phase: TRUST
 roadmap: specs/phase-plans-v13.md
-roadmap_sha256: b5f85f7b74a7d9f57bb57b3330ef912c04ac6304aee37a49f5a67345856116dc
+roadmap_sha256: 084b23212b9df39888f3772476dc7895bc99ff3d837d003a4c60cde4f2da2d14
 ---
 
 # PHASE-1-TRUST: Trust primitives
@@ -38,7 +38,7 @@ Two constraints from the roadmap's rev-2 board that shape the design:
 
 ## Interface Freeze Gates
 
-- [ ] IF-0-TRUST-1 — `TrustRecord(absolute_path: Path, content_sha256: str, scope: str, decision: str, recorded_at: datetime)`; `is_approved(path: Path, content: bytes) -> bool`, `record(path: Path, content: bytes, scope: str, decision: str) -> TrustRecord`, `revoke(path: Path) -> bool`, `list_records() -> list[TrustRecord]`; store resides at `~/.config/pmcp/trust.json` (user scope) and refuses a path inside the current checkout. The freeze also fixes the semantics a downstream lane would otherwise guess: `decision` is the closed vocabulary `{"approved", "denied"}` and `is_approved` returns `True` only for `"approved"` — a `"denied"` record is not merely absent; the store keeps **one record per absolute path** (re-approving replaces, it does not append a history); every I/O or parse failure reading the store **fails closed** (`is_approved` returns `False`, never raises to a caller that might treat an exception as permission); and the store file is created mode `0o600` with the residency check resolving symlinks before comparing against the checkout root.
+- [ ] IF-0-TRUST-1 — `TrustRecord(absolute_path: Path, content_sha256: str, scope: str, decision: str, recorded_at: datetime)`; `is_approved(path: Path, content: bytes) -> bool`, `record(path: Path, content: bytes, scope: str, decision: str) -> TrustRecord`, `revoke(path: Path) -> bool`, `list_records() -> list[TrustRecord]`; store resides at `~/.config/pmcp/trust.json` (user scope) and refuses a **store** path inside the current checkout. That residency rule binds where the store file lives, **not** which paths may be recorded: `record(path, …)` takes the path of the file being approved, which for every CONSENT lane is necessarily inside a checkout. Reading the refusal as binding `record` would block all of CONSENT; `EC-TRUST-5` and the frozen test name `test_a_store_inside_the_checkout_is_refused` are the tiebreaker. The freeze also fixes the semantics a downstream lane would otherwise guess: `decision` is the closed vocabulary `{"approved", "denied"}` and `is_approved` returns `True` only for `"approved"` — a `"denied"` record is not merely absent; the store keeps **one record per absolute path** (re-approving replaces, it does not append a history); every I/O or parse failure reading the store **fails closed** (`is_approved` returns `False`, never raises to a caller that might treat an exception as permission); and the store file is created mode `0o600` with the residency check resolving symlinks before comparing against the checkout root.
 - [ ] IF-0-TRUST-2 — `PackageIdentity(registry: str, name: str, resolved_version: str, integrity: str | None)` and `resolve_package_identity(spec: str) -> PackageIdentity | None`, resolving without executing the package.
 
 ## Lane Index & Dependencies
@@ -150,8 +150,12 @@ SL-4 — Documentation & spec reconciliation
   implementation evidence, which is what a plan is — those objections are not
   folded in.
 - **Single-writer files**: `src/pmcp/cli.py` — owner **SL-3**. No other lane in this
-  phase touches it. Note for later phases: CONSENT and PKGID do not write `cli.py`,
-  so no cross-phase serialization edge is created here.
+  phase touches it. **Correction (2026-09-08):** an earlier revision of this note
+  claimed "CONSENT and PKGID do not write `cli.py`". PKGID's plan does write it —
+  the cross-cutting principle requires every refusal to name a runnable `pmcp`
+  command, which means an approval verb. No concurrent-writer edge results (TRUST
+  is merged before PKGID opens, and CONSENT touches no `cli.py`), but the claim
+  as written was false and would have mis-set a later planner's expectations.
 - **Known destructive changes**: none — every lane is purely additive. `SL-3` adds a
   subparser to `cli.py` and modifies no existing verb.
 - **Expected add/add conflicts**: none — there is no SL-0 preamble lane; SL-1 and SL-2

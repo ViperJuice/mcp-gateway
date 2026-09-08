@@ -160,7 +160,7 @@ make a project policy able only to narrow the operator's policy.
 - [ ] EC-CONSENT-2 — an unapproved project `.mcp.json` is not applied, on the same terms.
 - [ ] EC-CONSENT-3 — a project policy may only **narrow**: a project file that allows a server the user policy denies leaves it denied; proven by a test that fails on today's first-match-wins behaviour.
 - [ ] EC-CONSENT-4 — approving a file, then editing it, revokes the approval automatically (content hash, not path).
-- [ ] EC-CONSENT-5 — an operator with no project files sees byte-identical behaviour to today; proven by the existing config/policy suites passing unmodified.
+- [ ] EC-CONSENT-5 — an operator with **no project files** sees byte-identical behaviour to today, proven by the suites that contain no project-scoped case passing unmodified. **WAS WRONG (rev 2):** it said "the existing config/policy suites passing unmodified", which is unsatisfiable — `tests/test_manifest_overlay.py::test_project_overrides_user_overrides_shipped` asserts that an *unapproved* overlay replaces a shipped command, `tests/test_config_loader.py` carries many project `.mcp.json` cases, and `tests/test_policy_fail_open.py` is entirely about discovered project policy. Those three suites encode the behaviour this phase changes and are updated by their owning lanes; demanding they pass unmodified would have forced an implementer to weaken the gate until the old assertions held.
 - [ ] EC-CONSENT-6 — an unapproved overlay that **adds a new server** rather than replacing a shipped one is also not applied, and the added server is **not** treated as manifest-backed downstream. Without this the add path slips the seam: CONSENT only refuses replacement, PKGID's default-deny exempts manifest-backed servers, and an unapproved package executes through the gap between two phases that each look complete.
 - [ ] EC-CONSENT-7 — an unapproved project `.mcp-gateway-policy.yaml` is **not applied at all** (not merely narrowed), on the same trust terms as the manifest and `.mcp.json`. EC-CONSENT-3 governs what an *approved* project policy may do; this governs whether it is read.
 
@@ -190,7 +190,7 @@ Package identity (PKGID owns it); any change to user- or env-scoped sources.
 - schema: `spec_delta_closeout.v1`
 - decision: `no_spec_delta`
 - target surfaces: `src/pmcp/manifest/loader.py`, `src/pmcp/config/loader.py`, `src/pmcp/policy/policy.py`
-- evidence paths: `tests/test_project_source_consent.py`, `SECURITY.md`, `CHANGELOG.md`
+- evidence paths: `tests/test_project_source_consent.py`, `CHANGELOG.md`
 - redaction posture: `metadata_only`
 - missing or malformed evidence routes to `blocker_class=contract_bug` (non-human).
 
@@ -236,7 +236,7 @@ Sandboxing what does run; auditing PMCP's own dependencies.
 - schema: `spec_delta_closeout.v1`
 - decision: `no_spec_delta`
 - target surfaces: `src/pmcp/tools/handlers.py`, `src/pmcp/policy/policy.py`, `src/pmcp/manifest/installer.py`
-- evidence paths: `tests/test_package_identity_gate.py`, `SECURITY.md`, `CHANGELOG.md`
+- evidence paths: `tests/test_package_identity_gate.py`, `CHANGELOG.md`
 - redaction posture: `metadata_only`
 - missing or malformed evidence routes to `blocker_class=contract_bug` (non-human).
 
@@ -277,7 +277,7 @@ Redesigning the feedback feature; the wider redaction rework (that is S-12/#234)
 - schema: `spec_delta_closeout.v1`
 - decision: `no_spec_delta`
 - target surfaces: `src/pmcp/tools/handlers.py`
-- evidence paths: `tests/test_feedback_egress.py`, `SECURITY.md`, `CHANGELOG.md`
+- evidence paths: `tests/test_feedback_egress.py`, `CHANGELOG.md`
 - redaction posture: `metadata_only`
 - missing or malformed evidence routes to `blocker_class=contract_bug` (non-human).
 
@@ -359,6 +359,19 @@ New gates. This phase proves and documents; it does not add behaviour.
 - Single-writer hazards to serialise: `src/pmcp/tools/handlers.py` is written by
   PKGID lane A and both EGRESS lanes; `src/pmcp/policy/policy.py` by CONSENT lane C
   and PKGID lane B. Do not run those lanes against the same file concurrently.
+- **CONSENT and PKGID may be planned concurrently, but must execute serially.**
+  They are sibling branches off TRUST with no freeze between them, so the DAG
+  permits parallel execution — but their lane plans declare four shared writers:
+  `src/pmcp/policy/policy.py` (CONSENT SL-4 and PKGID SL-2 both own it),
+  plus `.claude/docs-catalog.json`, `CHANGELOG.md`, and this roadmap file from
+  the two docs lanes. Each plan is internally disjoint; the collision is only
+  visible pairwise across the two phases, which no single plan's own
+  ownership check can see. **Execute CONSENT first, merge it, then execute PKGID** —
+  the order is fixed, not free. PKGID's package predicate is tri-state and CONSENT
+  owns the composition that must wrap it, so the integration criterion (a project
+  `"allowed"` package cannot override a user `"denied"` package) is only provable
+  once CONSENT has landed; it is therefore owned by PKGID, the second phase, which
+  is the only place both halves exist.
 - Every phase ships a CHANGELOG entry; `SECURITY.md` is written once, in SEAL, to
   avoid four partial descriptions of one model.
 
