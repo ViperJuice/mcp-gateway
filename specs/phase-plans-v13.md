@@ -366,7 +366,12 @@ New gates. This phase proves and documents; it does not add behaviour.
   plus `.claude/docs-catalog.json`, `CHANGELOG.md`, and this roadmap file from
   the two docs lanes. Each plan is internally disjoint; the collision is only
   visible pairwise across the two phases, which no single plan's own
-  ownership check can see. Execute one, merge it, then execute the other.
+  ownership check can see. **Execute CONSENT first, merge it, then execute PKGID** —
+  the order is fixed, not free. PKGID's package predicate is tri-state and CONSENT
+  owns the composition that must wrap it, so the integration criterion (a project
+  `"allowed"` package cannot override a user `"denied"` package) is only provable
+  once CONSENT has landed; it is therefore owned by PKGID, the second phase, which
+  is the only place both halves exist.
 - Every phase ships a CHANGELOG entry; `SECURITY.md` is written once, in SEAL, to
   avoid four partial descriptions of one model.
 

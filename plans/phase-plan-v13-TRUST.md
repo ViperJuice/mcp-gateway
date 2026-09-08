@@ -2,7 +2,7 @@
 phase_loop_plan_version: 1
 phase: TRUST
 roadmap: specs/phase-plans-v13.md
-roadmap_sha256: cdc52f20a48d07f679a7a86d44c0eeb5ab6ed69e7e7676980b5e0379df2ca7eb
+roadmap_sha256: 084b23212b9df39888f3772476dc7895bc99ff3d837d003a4c60cde4f2da2d14
 ---
 
 # PHASE-1-TRUST: Trust primitives
