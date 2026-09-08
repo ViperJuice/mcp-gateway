@@ -359,6 +359,14 @@ New gates. This phase proves and documents; it does not add behaviour.
 - Single-writer hazards to serialise: `src/pmcp/tools/handlers.py` is written by
   PKGID lane A and both EGRESS lanes; `src/pmcp/policy/policy.py` by CONSENT lane C
   and PKGID lane B. Do not run those lanes against the same file concurrently.
+- **CONSENT and PKGID may be planned concurrently, but must execute serially.**
+  They are sibling branches off TRUST with no freeze between them, so the DAG
+  permits parallel execution — but their lane plans declare four shared writers:
+  `src/pmcp/policy/policy.py` (CONSENT SL-4 and PKGID SL-2 both own it),
+  plus `.claude/docs-catalog.json`, `CHANGELOG.md`, and this roadmap file from
+  the two docs lanes. Each plan is internally disjoint; the collision is only
+  visible pairwise across the two phases, which no single plan's own
+  ownership check can see. Execute one, merge it, then execute the other.
 - Every phase ships a CHANGELOG entry; `SECURITY.md` is written once, in SEAL, to
   avoid four partial descriptions of one model.
 
