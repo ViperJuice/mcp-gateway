@@ -150,8 +150,12 @@ SL-4 — Documentation & spec reconciliation
   implementation evidence, which is what a plan is — those objections are not
   folded in.
 - **Single-writer files**: `src/pmcp/cli.py` — owner **SL-3**. No other lane in this
-  phase touches it. Note for later phases: CONSENT and PKGID do not write `cli.py`,
-  so no cross-phase serialization edge is created here.
+  phase touches it. **Correction (2026-09-08):** an earlier revision of this note
+  claimed "CONSENT and PKGID do not write `cli.py`". PKGID's plan does write it —
+  the cross-cutting principle requires every refusal to name a runnable `pmcp`
+  command, which means an approval verb. No concurrent-writer edge results (TRUST
+  is merged before PKGID opens, and CONSENT touches no `cli.py`), but the claim
+  as written was false and would have mis-set a later planner's expectations.
 - **Known destructive changes**: none — every lane is purely additive. `SL-3` adds a
   subparser to `cli.py` and modifies no existing verb.
 - **Expected add/add conflicts**: none — there is no SL-0 preamble lane; SL-1 and SL-2
